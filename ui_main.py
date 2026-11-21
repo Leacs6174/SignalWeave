@@ -24,7 +24,6 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
-    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -38,6 +37,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
+    QTabBar,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -265,10 +265,12 @@ class MainWindow(QMainWindow):
         self.add_files_action.triggered.connect(self._choose_files)
         self.copy_action.triggered.connect(self._copy_result)
 
-        file_button = QToolButton()
-        file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        file_button.setText("文件")
-        file_menu = QMenu(file_button)
+        self.file_button = QToolButton()
+        self.file_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.file_button.setText("文件")
+        self.file_menu = QMenu(self.file_button)
+        self.file_menu.setObjectName("fileMenu")
+        self.file_menu.setFont(_font(10))
         for action in (
             self.new_action,
             self.open_project_action,
@@ -276,13 +278,15 @@ class MainWindow(QMainWindow):
             self.save_as_action,
             self.close_project_action,
         ):
-            file_menu.addAction(action)
-        file_button.setMenu(file_menu)
-        self.toolbar.addWidget(file_button)
+            self.file_menu.addAction(action)
+        self.file_button.setMenu(self.file_menu)
+        self.toolbar.addWidget(self.file_button)
 
         self.type_button = QToolButton()
         self.type_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.type_menu = QMenu(self.type_button)
+        self.type_menu.setObjectName("typeMenu")
+        self.type_menu.setFont(_font(10))
         self.cd_action = QAction("CD 光谱", self)
         self.electrochem_action = QAction("电化学", self)
         self.cd_action.setCheckable(True)
@@ -312,14 +316,19 @@ class MainWindow(QMainWindow):
         recent_layout.setSpacing(9)
         recent_label = QLabel("最近工程")
         recent_label.setObjectName("recentLabel")
-        self.recent_combo = QComboBox()
-        self.recent_combo.setObjectName("recentCombo")
-        self.recent_combo.setMinimumWidth(360)
-        self.recent_combo.currentIndexChanged.connect(
+        self.recent_tabs = QTabBar()
+        self.recent_tabs.setObjectName("recentTabs")
+        self.recent_tabs.setDocumentMode(True)
+        self.recent_tabs.setExpanding(False)
+        self.recent_tabs.setMovable(False)
+        self.recent_tabs.setTabsClosable(False)
+        self.recent_tabs.setUsesScrollButtons(True)
+        self.recent_tabs.setElideMode(Qt.TextElideMode.ElideRight)
+        self.recent_tabs.currentChanged.connect(
             self._recent_project_selected
         )
         recent_layout.addWidget(recent_label)
-        recent_layout.addWidget(self.recent_combo, 1)
+        recent_layout.addWidget(self.recent_tabs, 1)
         self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._wrap_recent_bar(recent_host))
 
@@ -341,11 +350,6 @@ class MainWindow(QMainWindow):
 
         header = QHBoxLayout()
         header.setSpacing(12)
-        logo = QLabel("DM")
-        logo.setObjectName("logo")
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo.setFixedSize(46, 46)
-        header.addWidget(logo)
         title_box = QVBoxLayout()
         title_box.setSpacing(1)
         title = QLabel("DataMerger")
@@ -595,6 +599,7 @@ class MainWindow(QMainWindow):
         self.project_path = None
         self._dirty = False
         self._apply_data_type(data_type)
+        self._refresh_recent_projects()
 
     def _choose_files(self) -> None:
         initial = (
@@ -947,6 +952,7 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._refresh_table()
         self._schedule_merge()
+        self._refresh_recent_projects()
         self._update_window_title()
 
     def _close_project(self) -> None:
@@ -1056,29 +1062,46 @@ class MainWindow(QMainWindow):
 
     def _refresh_recent_projects(self) -> None:
         self._refreshing_recent = True
-        blocker = QSignalBlocker(self.recent_combo)
-        self.recent_combo.clear()
-        self.recent_combo.addItem("选择最近工程…", "")
-        for path in load_recent_projects(self.recent_config):
+        blocker = QSignalBlocker(self.recent_tabs)
+        while self.recent_tabs.count():
+            self.recent_tabs.removeTab(0)
+        recent = load_recent_projects(self.recent_config)
+        if not recent:
+            index = self.recent_tabs.addTab("暂无最近工程")
+            self.recent_tabs.setTabData(index, "")
+            self.recent_tabs.setTabEnabled(index, False)
+        for path in recent:
             source = Path(path)
-            label = f"{source.stem} — {source.parent}"
-            self.recent_combo.addItem(label, path)
-            self.recent_combo.setItemData(
-                self.recent_combo.count() - 1,
-                path,
-                Qt.ItemDataRole.ToolTipRole,
-            )
-        self.recent_combo.setCurrentIndex(0)
+            index = self.recent_tabs.addTab(source.stem)
+            self.recent_tabs.setTabData(index, path)
+            self.recent_tabs.setTabToolTip(index, str(source))
+        self._select_current_recent_tab()
         del blocker
         self._refreshing_recent = False
 
-    def _recent_project_selected(self, index: int) -> None:
-        if self._refreshing_recent or index <= 0:
+    def _select_current_recent_tab(self) -> None:
+        if self.project_path is None:
+            self.recent_tabs.setCurrentIndex(-1)
             return
-        path = self.recent_combo.itemData(index)
+        current = os.path.normcase(str(self.project_path.resolve(strict=False)))
+        for index in range(self.recent_tabs.count()):
+            path = self.recent_tabs.tabData(index)
+            if (
+                isinstance(path, str)
+                and path
+                and os.path.normcase(str(Path(path).resolve(strict=False))) == current
+            ):
+                self.recent_tabs.setCurrentIndex(index)
+                return
+        self.recent_tabs.setCurrentIndex(-1)
+
+    def _recent_project_selected(self, index: int) -> None:
+        if self._refreshing_recent or index < 0:
+            return
+        path = self.recent_tabs.tabData(index) if index >= 0 else ""
         if isinstance(path, str) and path:
             if not self._open_project(path):
-                self.recent_combo.setCurrentIndex(0)
+                self._select_current_recent_tab()
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if event.mimeData().hasUrls() and any(
@@ -1154,20 +1177,31 @@ QLabel#recentLabel {
     font-size: 11px;
     font-weight: 600;
 }
-QComboBox#recentCombo {
-    background: #ffffff;
-    border: 1px solid #dbe3ec;
-    border-radius: 7px;
-    padding: 5px 9px;
-    color: #334155;
+QTabBar#recentTabs {
+    background: transparent;
+    border: none;
+    qproperty-drawBase: 0;
 }
-QLabel#logo {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2563eb, stop:1 #0f766e);
-    color: white;
-    border-radius: 13px;
-    font-family: "Segoe UI";
-    font-size: 14px;
-    font-weight: 700;
+QTabBar#recentTabs::tab {
+    background: #eef3f8;
+    color: #475569;
+    border: 1px solid #dbe3ec;
+    border-bottom: none;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    min-width: 92px;
+    max-width: 230px;
+    padding: 6px 16px;
+    margin-right: 3px;
+}
+QTabBar#recentTabs::tab:selected {
+    background: #ffffff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+    font-weight: 600;
+}
+QTabBar#recentTabs::tab:hover:!selected {
+    background: #f5f8fb;
 }
 QLabel#title {
     font-family: "Microsoft YaHei UI";
@@ -1297,17 +1331,28 @@ QCheckBox {
 }
 QMenu {
     background: white;
+    color: #253044;
     border: 1px solid #dfe7ef;
     border-radius: 8px;
     padding: 5px;
+    font-family: "Microsoft YaHei UI";
+    font-size: 12px;
 }
 QMenu::item {
+    color: #253044;
+    background: transparent;
+    font-family: "Microsoft YaHei UI";
+    font-size: 12px;
+    min-height: 20px;
     padding: 7px 28px 7px 24px;
     border-radius: 5px;
 }
 QMenu::item:selected {
     background: #eff6ff;
     color: #1d4ed8;
+}
+QMenu::item:disabled {
+    color: #94a3b8;
 }
 QMenu::indicator:checked {
     background: #2563eb;

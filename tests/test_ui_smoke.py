@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QTabBar, QWidget  # noqa: E402
 
 from app import MainWindow  # noqa: E402
 
@@ -112,7 +112,17 @@ class UiSmokeTests(unittest.TestCase):
 
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
-        self.assertGreaterEqual(self.window.recent_combo.count(), 1)
+        self.assertIsInstance(self.window.recent_tabs, QTabBar)
+        self.assertGreaterEqual(self.window.recent_tabs.count(), 1)
+        self.assertIsNone(self.window.findChild(QWidget, "logo"))
+        self.assertEqual(
+            [action.text() for action in self.window.file_menu.actions()],
+            ["新建工程", "打开工程", "保存工程", "工程另存为", "关闭工程"],
+        )
+        self.assertEqual(
+            [action.text() for action in self.window.type_menu.actions()],
+            ["CD 光谱", "电化学"],
+        )
         self.window._apply_data_type("electrochem")
         self.window._add_paths(
             [str(FIXTURES / "OER_A.txt"), str(FIXTURES / "OER_B.txt")]
@@ -138,6 +148,12 @@ class UiSmokeTests(unittest.TestCase):
         self.window.project_path = Path(self.temp.name) / "ui-test.dmproj"
         self.assertTrue(self.window._save_project())
         self.assertFalse(self.window._dirty)
+        self.assertEqual(self.window.recent_tabs.count(), 1)
+        self.assertEqual(
+            self.window.recent_tabs.tabData(0),
+            str(self.window.project_path.resolve()),
+        )
+        self.assertEqual(self.window.recent_tabs.currentIndex(), 0)
 
         self.assertTrue(self.window._open_project(str(self.window.project_path)))
         self.assertEqual(self.window.data_type, "cd")
@@ -146,6 +162,26 @@ class UiSmokeTests(unittest.TestCase):
             self.window.project_path,
             (Path(self.temp.name) / "ui-test.dmproj").resolve(),
         )
+
+    def test_recent_tabs_switch_between_projects(self) -> None:
+        first = Path(self.temp.name) / "first.dmproj"
+        second = Path(self.temp.name) / "second.dmproj"
+        self.window._add_paths([str(FIXTURES / "A.txt")])
+        self.window.project_path = first
+        self.assertTrue(self.window._save_project())
+
+        self.window._new_project()
+        self.window._add_paths([str(FIXTURES / "B.txt")])
+        self.window.project_path = second
+        self.assertTrue(self.window._save_project())
+        self.assertEqual(self.window.recent_tabs.count(), 2)
+        self.assertEqual(self.window.recent_tabs.tabText(0), "second")
+        self.assertEqual(self.window.recent_tabs.tabText(1), "first")
+
+        self.window.recent_tabs.setCurrentIndex(1)
+        self.app.processEvents()
+        self.assertEqual(self.window.project_path, first.resolve())
+        self.assertEqual(self.window.entries[0].path.name, "A.txt")
 
 
 if __name__ == "__main__":

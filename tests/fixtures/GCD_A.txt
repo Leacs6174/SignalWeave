@@ -1,0 +1,8 @@
+Nov. 19, 2026 14:38:15
+Chronopotentiometry
+Instrument Model: CHI760F
+
+Time/sec, Potential/V
+0.000e+0, -1.605e-1
+1.000e-2, -1.431e-1
+2.000e-2, -1.297e-1

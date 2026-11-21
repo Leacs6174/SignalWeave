@@ -1,0 +1,10 @@
+Nov. 19, 2026 10:00:00
+Cyclic Voltammetry
+Instrument Model: CHI760F
+
+Potential/V, Current/A
+-0.1, 1.0e-6
+0.0, 2.0e-6
+0.1, 3.0e-6
+0.0, 4.0e-6
+-0.1, 5.0e-6

@@ -1,0 +1,6 @@
+Sample Name	A
+Comment	DataMerger fixture
+XYDATA
+900.00	1.2300	10.10	0.1010
+899.50	2.0000	20.20	0.2020
+899.00	1.6000	30.30	0.3030

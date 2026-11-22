@@ -137,4 +137,4 @@ release\SignalWeave Win11 x64.zip
 
 ## 许可证
 
-本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE) 许可证，允许非商业使用、修改和分发，禁止商业用途。该许可证属于源码公开（source-available）许可，并非 OSI 定义的开源许可证。
+本项目采用 [GNU Affero General Public License v3.0 or later](LICENSE)（`AGPL-3.0-or-later`）。允许商业使用、修改和分发；分发修改版本或通过网络提供修改版本时，必须遵守 AGPL 的源码开放与同许可证要求。

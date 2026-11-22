@@ -77,6 +77,11 @@ class ThemeTests(unittest.TestCase):
         for name, value in colors("dark").items():
             red, green, blue = (int(value[index : index + 2], 16) for index in (1, 3, 5))
             self.assertEqual((red, green, blue), (red, red, red), name)
+        apply_theme(self.app, "", mode="dark")
+        self.assertIn("QToolBar::separator", self.app.styleSheet())
+        self.assertIn("QMenu::item:selected", self.app.styleSheet())
+        self.assertIn("background: #343434", self.app.styleSheet())
+        apply_theme(self.app, "")
 
 
 if __name__ == "__main__":

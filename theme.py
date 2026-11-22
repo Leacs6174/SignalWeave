@@ -38,8 +38,8 @@ DARK_COLORS = {
     "text_heading": "#fafafa",
     "text_muted": "#a3a3a3",
     "text_disabled": "#737373",
-    "accent": "#d4d4d4",
-    "accent_hover": "#f5f5f5",
+    "accent": "#8f8f8f",
+    "accent_hover": "#b5b5b5",
     "accent_soft": "#2d2d2d",
     "selection": "#525252",
     "danger": "#d4d4d4",
@@ -233,6 +233,9 @@ QToolBar#mainToolbar {{
 QToolBar#recentToolbar, QWidget#recentHost {{
     background: {tokens["surface_alt"]};
 }}
+QToolBar::separator {{
+    background: {tokens["border"]};
+}}
 QToolBar QToolButton {{
     color: {tokens["text"]};
 }}
@@ -249,6 +252,10 @@ QTabBar#recentTabs::tab:selected, QTabWidget#previewTabs QTabBar::tab:selected {
     background: {tokens["surface"]};
     color: {tokens["accent"]};
 }}
+QTabBar#recentTabs::tab:hover:!selected, QTabWidget#previewTabs QTabBar::tab:hover:!selected {{
+    background: {tokens["surface_subtle"]};
+    color: {tokens["text"]};
+}}
 QLabel#title, QLabel#dropTitle, QLabel#sectionTitle {{
     color: {tokens["text_heading"]};
 }}
@@ -263,6 +270,9 @@ QLabel#smallBadge, QLabel#pill {{
 QFrame#card, QFrame#plotCard {{
     background: {tokens["surface"]};
     border-color: {tokens["border"]};
+}}
+QSplitter::handle:hover {{
+    background: {tokens["border_strong"]};
 }}
 QFrame#dropZone {{
     background: {tokens["surface_subtle"]};
@@ -291,9 +301,12 @@ QPushButton#outlineButton:hover, QPushButton#smallButton:hover {{
     border-color: {tokens["text_muted"]};
 }}
 QPushButton#primaryButton {{
-    background: {tokens["accent"]};
-    color: #0a0a0a;
-    border-color: {tokens["accent_hover"]};
+    background: #343434;
+    color: #f0f0f0;
+    border-color: #565656;
+}}
+QPushButton#primaryButton:hover {{
+    background: #404040;
 }}
 QPushButton:disabled {{
     background: {tokens["surface_subtle"]};
@@ -321,6 +334,25 @@ QScrollArea#plotPreview, QWidget#plotHost {{
 }}
 QCheckBox {{
     color: {tokens["text"]};
+}}
+QMenu {{
+    background: {tokens["surface"]};
+    color: {tokens["text"]};
+    border-color: {tokens["border"]};
+}}
+QMenu::item {{
+    color: {tokens["text"]};
+    background: transparent;
+}}
+QMenu::item:selected {{
+    background: {tokens["accent_soft"]};
+    color: {tokens["text_heading"]};
+}}
+QMenu::item:disabled {{
+    color: {tokens["text_disabled"]};
+}}
+QMenu::indicator:checked {{
+    background: {tokens["accent"]};
 }}
 """
 

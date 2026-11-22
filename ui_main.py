@@ -762,7 +762,7 @@ class MainWindow(QMainWindow):
         self.drop_zone.refresh_theme()
         self.add_files_action.setIcon(_icon("add", accent_color))
         self.copy_action.setIcon(_icon("copy", icon_color))
-        primary_icon = "#f0f0f0" if active_mode() == "dark" else "#253044"
+        primary_icon = "#f0f0f0" if active_mode() == "dark" else "#ffffff"
         self.copy_button.setIcon(_icon("copy", primary_icon, 17))
         self.up_button.setIcon(_icon("up", icon_color, 15))
         self.down_button.setIcon(_icon("down", icon_color, 15))
@@ -1689,14 +1689,14 @@ QPushButton#outlineButton:hover, QPushButton#smallButton:hover {
     border-color: #b8c5d5;
 }
 QPushButton#primaryButton {
-    background: #e2e5e9;
-    color: #253044;
-    border: 1px solid #c9ced6;
+    background: #2563eb;
+    color: white;
+    border: 1px solid #1d4ed8;
     padding: 9px 15px;
     font-weight: 600;
 }
 QPushButton#primaryButton:hover {
-    background: #d5d9df;
+    background: #1d4ed8;
 }
 QPushButton:disabled {
     color: #94a3b8;

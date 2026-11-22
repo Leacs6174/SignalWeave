@@ -318,6 +318,7 @@ class UiSmokeTests(unittest.TestCase):
         dialog.close()
 
     def test_theme_and_font_settings_apply_and_persist(self) -> None:
+        self.assertIn("background: #2563eb;", APP_STYLE)
         self.window._set_theme("dark")
         self.assertEqual(self.app.property("dataMergerTheme"), "dark")
         self.assertEqual(load_user_config(self.window.config_path).theme_mode, "dark")

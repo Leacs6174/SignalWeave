@@ -1599,6 +1599,11 @@ QTabBar#recentTabs::tab {
     padding: 6px 16px;
     margin-right: 3px;
 }
+QTabBar#recentTabs::tab:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #e2e8f0;
+}
 QTabBar#recentTabs::tab:selected {
     background: #ffffff;
     color: #1d4ed8;

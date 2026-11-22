@@ -248,6 +248,11 @@ QTabBar#recentTabs::tab, QTabWidget#previewTabs QTabBar::tab {{
     color: {tokens["text_muted"]};
     border-color: {tokens["border"]};
 }}
+QTabBar#recentTabs::tab:disabled, QTabWidget#previewTabs QTabBar::tab:disabled {{
+    background: {tokens["surface_alt"]};
+    color: {tokens["text_disabled"]};
+    border-color: {tokens["border"]};
+}}
 QTabBar#recentTabs::tab:selected, QTabWidget#previewTabs QTabBar::tab:selected {{
     background: {tokens["surface"]};
     color: {tokens["accent"]};

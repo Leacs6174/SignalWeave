@@ -80,6 +80,9 @@ class ThemeTests(unittest.TestCase):
         apply_theme(self.app, "", mode="dark")
         self.assertIn("QToolBar::separator", self.app.styleSheet())
         self.assertIn("QMenu::item:selected", self.app.styleSheet())
+        self.assertIn(
+            "QTabBar#recentTabs::tab:disabled", self.app.styleSheet()
+        )
         self.assertIn("background: #343434", self.app.styleSheet())
         apply_theme(self.app, "")
 

@@ -9,9 +9,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
-from PySide6.QtWidgets import QApplication, QTabBar, QWidget  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel, QTabBar, QWidget  # noqa: E402
 
 from app import MainWindow  # noqa: E402
+from user_config import UserConfig, load_user_config  # noqa: E402
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -26,6 +27,9 @@ class UiSmokeTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.window = MainWindow()
         self.window.recent_config = Path(self.temp.name) / "recent.json"
+        self.window.config_path = Path(self.temp.name) / "config.json"
+        self.window.user_config = UserConfig()
+        self.window._sync_channel_controls()
 
     def tearDown(self) -> None:
         self.window._dirty = False
@@ -64,8 +68,8 @@ class UiSmokeTests(unittest.TestCase):
         self.window._add_paths(
             [str(FIXTURES / "A.txt"), str(FIXTURES / "B.txt")]
         )
-        self.window.channel_checks["HT"].setChecked(False)
-        self.window.channel_checks["Abs"].setChecked(False)
+        self.window.merge_channel_checks["HT"].setChecked(False)
+        self.window.merge_channel_checks["Abs"].setChecked(False)
         self.window._recompute_merge()
         self.app.processEvents()
         assert self.window.result is not None
@@ -101,6 +105,21 @@ class UiSmokeTests(unittest.TestCase):
 
         self.assertTrue(self.window.isVisible())
         self.assertEqual(self.window.file_table.rowCount(), 2)
+        self.assertEqual(
+            [
+                name
+                for name, check in self.window.preview_channel_checks.items()
+                if check.isChecked()
+            ],
+            ["CD", "G"],
+        )
+        self.assertEqual(
+            list(self.window.merge_channel_checks), ["CD", "HT", "Abs"]
+        )
+        self.assertEqual(
+            list(self.window.preview_channel_checks), ["CD", "HT", "Abs", "G"]
+        )
+        self.assertEqual(len(self.window.plot_preview.plots), 2)
         self.assertIsNotNone(self.window.result)
         for row in range(2):
             item = self.window.file_table.item(row, 2)
@@ -110,11 +129,26 @@ class UiSmokeTests(unittest.TestCase):
         self.window.close()
         self.app.processEvents()
 
+    def test_preview_and_merge_channel_settings_are_persisted(self) -> None:
+        self.window._add_paths([str(FIXTURES / "A.txt")])
+        self.window._recompute_merge()
+        self.window.merge_channel_checks["HT"].setChecked(False)
+        self.window.preview_channel_checks["HT"].setChecked(True)
+        config = load_user_config(self.window.config_path)
+        self.assertNotIn("HT", config.cd_merge_channels)
+        self.assertIn("HT", config.cd_preview_channels)
+        self.assertEqual(set(config.cd_preview_channels), {"CD", "G", "HT"})
+        self.assertEqual(len(self.window.plot_preview.plots), 3)
+
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
         self.assertIsInstance(self.window.recent_tabs, QTabBar)
         self.assertGreaterEqual(self.window.recent_tabs.count(), 1)
         self.assertIsNone(self.window.findChild(QWidget, "logo"))
+        self.assertNotIn(
+            "本地处理",
+            " ".join(label.text() for label in self.window.findChildren(QLabel)),
+        )
         self.assertEqual(
             [action.text() for action in self.window.file_menu.actions()],
             ["新建工程", "打开工程", "保存工程", "工程另存为", "关闭工程"],
@@ -136,9 +170,24 @@ class UiSmokeTests(unittest.TestCase):
             ("Potential (V)", "Current1", "Current2"),
         )
         self.assertEqual(self.window.type_button.text(), "数据类型：电化学")
-        self.assertFalse(self.window.channel_card.isVisible())
+        self.assertFalse(self.window.channel_card.isHidden())
         self.assertFalse(self.window.formula_button.isVisible())
         self.assertEqual(self.window.file_table.rowCount(), 2)
+        self.assertEqual(
+            list(self.window.merge_channel_checks),
+            ["Current"],
+        )
+        self.assertTrue(
+            all(check.isChecked() for check in self.window.merge_channel_checks.values())
+        )
+        self.assertTrue(
+            all(check.isChecked() for check in self.window.preview_channel_checks.values())
+        )
+        self.assertEqual(len(self.window.plot_preview.plots), 1)
+        self.window.preview_channel_checks["Current"].setChecked(False)
+        config = load_user_config(self.window.config_path)
+        self.assertEqual(config.electrochem_preview_channels, ())
+        self.assertEqual(len(self.window.plot_preview.plots), 0)
 
     def test_project_round_trip_restores_disabled_file(self) -> None:
         self.window._add_paths(

@@ -144,6 +144,22 @@ class ElectrochemCoreTests(unittest.TestCase):
             ),
         )
 
+    def test_merge_channel_filter_controls_export_columns(self) -> None:
+        path = write_chi(
+            self.root / "eis.txt",
+            "Freq (Hz), Z' (ohm), Phase (deg)",
+            [("1.0", "10.0", "-5.0"), ("0.1", "20.0", "-10.0")],
+        )
+        result = merge_electrochem(
+            [read_electrochem(path)], channels=("Phase",)
+        )
+        self.assertEqual(result.header, ("Freq (Hz)", "Phase1"))
+        self.assertEqual(result.channels, ("Phase",))
+        self.assertEqual(
+            [(item.channel, item.header) for item in result.series],
+            [("Phase", "Phase1")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

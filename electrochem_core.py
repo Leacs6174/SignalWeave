@@ -270,12 +270,21 @@ def read_electrochem(
 
 
 @dataclass(frozen=True)
+class ElectrochemSeries:
+    channel: str
+    header: str
+    file_index: int
+
+
+@dataclass(frozen=True)
 class ElectrochemMergeResult:
     axis_label: str
     header: tuple[str, ...]
     rows: tuple[tuple[str, ...], ...]
     missing_values: int
     participating_files: int
+    channels: tuple[str, ...]
+    series: tuple[ElectrochemSeries, ...]
 
     @property
     def row_count(self) -> int:
@@ -326,6 +335,7 @@ def _build_groups(
 def merge_electrochem(
     signals: Iterable[ElectrochemSignal],
     tolerance: float = DEFAULT_AXIS_TOLERANCE,
+    channels: Sequence[str] | None = None,
 ) -> ElectrochemMergeResult:
     """Merge same-axis signals side by side without interpolation."""
     selected = list(signals)
@@ -344,13 +354,46 @@ def merge_electrochem(
             "请分别合并相同横坐标的数据"
         )
 
+    available_channels = tuple(
+        dict.fromkeys(
+            channel
+            for signal in selected
+            for channel in signal.channel_names
+        )
+    )
+    if channels is None:
+        selected_channels = available_channels
+    else:
+        unknown = [channel for channel in channels if channel not in available_channels]
+        if unknown:
+            raise ElectrochemError(
+                "未知或不存在的电化学通道：" + "、".join(unknown)
+            )
+        selected_channels = tuple(
+            channel
+            for channel in available_channels
+            if channel in set(channels)
+        )
+    if not selected_channels:
+        raise ElectrochemError("至少选择一个电化学数据通道")
+
     groups = _build_groups(selected, tolerance)
     groups.sort(key=lambda group: group[0].x)
     header = [selected[0].axis.label]
+    series: list[ElectrochemSeries] = []
     for file_index, signal in enumerate(selected, start=1):
-        header.extend(
-            f"{channel}{file_index}" for channel in signal.channel_names
-        )
+        for channel in selected_channels:
+            if channel not in signal.channels:
+                continue
+            header_name = f"{channel}{file_index}"
+            header.append(header_name)
+            series.append(
+                ElectrochemSeries(
+                    channel=channel,
+                    header=header_name,
+                    file_index=file_index,
+                )
+            )
 
     rows: list[tuple[str, ...]] = []
     missing_values = 0
@@ -375,7 +418,9 @@ def merge_electrochem(
             for file_index, signal in enumerate(selected):
                 items = by_file.get(file_index, [])
                 point = items[occurrence] if occurrence < len(items) else None
-                for channel_name in signal.channel_names:
+                for channel_name in selected_channels:
+                    if channel_name not in signal.channels:
+                        continue
                     cell = (
                         signal.channels[channel_name][point.point_index]
                         if point is not None
@@ -392,4 +437,6 @@ def merge_electrochem(
         rows=tuple(rows),
         missing_values=missing_values,
         participating_files=len(selected),
+        channels=selected_channels,
+        series=tuple(series),
     )

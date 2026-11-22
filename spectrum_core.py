@@ -129,6 +129,11 @@ class MergeResult:
         return tuple(values)
 
     @property
+    def export_rows(self) -> tuple[tuple[str, ...], ...]:
+        """Rows exactly as exported, including calculated G factors."""
+        return tuple(self._row_with_g_values(row) for row in self.rows)
+
+    @property
     def text(self) -> str:
         # Origin's plain-text paste maps the first three TSV rows to Long Name,
         # Units, and Comments. The special F(x)= row is never populated by a
@@ -137,7 +142,7 @@ class MergeResult:
         blank_row = "\t" * (len(self.header) - 1)
         lines.append(blank_row)
         lines.append(blank_row)
-        lines.extend("\t".join(self._row_with_g_values(row)) for row in self.rows)
+        lines.extend("\t".join(row) for row in self.export_rows)
         return "\n".join(lines)
 
     @property

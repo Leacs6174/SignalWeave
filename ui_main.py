@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabBar,
+    QTabWidget,
     QToolBar,
     QToolButton,
     QVBoxLayout,
@@ -60,13 +61,23 @@ from project_io import (
     record_recent_project,
     save_project,
 )
+from plot_data import cd_plot_graphs, electrochem_plot_graphs
+from plot_widget import PlotPreviewWidget
 from spectrum_core import (
-    DEFAULT_CHANNELS,
     MergeResult,
     Spectrum,
     SpectrumError,
     merge_exact_union,
     read_spectrum,
+)
+from user_config import (
+    CD_MERGE_DEFAULT,
+    CD_PREVIEW_DEFAULT,
+    UserConfig,
+    load_user_config,
+    save_user_config,
+    selected_channels,
+    with_channels,
 )
 
 DATA_TYPE_NAMES = {"cd": "CD 光谱", "electrochem": "电化学"}
@@ -224,8 +235,11 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._refreshing_table = False
         self._refreshing_recent = False
-        self.channel_checks: dict[str, QCheckBox] = {}
+        self.merge_channel_checks: dict[str, QCheckBox] = {}
+        self.preview_channel_checks: dict[str, QCheckBox] = {}
         self.recent_config = _application_dir() / "DataMerger-recent.json"
+        self.config_path = _application_dir() / "DataMerger-config.json"
+        self.user_config = load_user_config(self.config_path)
         self._merge_timer = QTimer(self)
         self._merge_timer.setSingleShot(True)
         self._merge_timer.setInterval(25)
@@ -360,9 +374,6 @@ class MainWindow(QMainWindow):
         title_box.addWidget(self.subtitle)
         header.addLayout(title_box)
         header.addStretch(1)
-        privacy = QLabel("本地处理 · 不上传")
-        privacy.setObjectName("badge")
-        header.addWidget(privacy)
         outer.addLayout(header)
 
         self.drop_zone = DropZone()
@@ -449,20 +460,25 @@ class MainWindow(QMainWindow):
         self.channel_card.setObjectName("card")
         channel_layout = QVBoxLayout(self.channel_card)
         channel_layout.setContentsMargins(16, 13, 16, 13)
-        channel_layout.setSpacing(8)
-        channel_title = QLabel("CD 输出通道")
+        channel_layout.setSpacing(6)
+        channel_title = QLabel("通道设置")
         channel_title.setObjectName("sectionTitle")
         channel_layout.addWidget(channel_title)
-        channel_row = QHBoxLayout()
-        for name in DEFAULT_CHANNELS:
-            check = QCheckBox(name)
-            check.setObjectName("channelCheck")
-            check.setChecked(True)
-            check.toggled.connect(self._channels_changed)
-            self.channel_checks[name] = check
-            channel_row.addWidget(check)
-        channel_row.addStretch(1)
-        channel_layout.addLayout(channel_row)
+        merge_label = QLabel("合并 / 导出")
+        merge_label.setObjectName("muted")
+        channel_layout.addWidget(merge_label)
+        self.merge_channels_row = QHBoxLayout()
+        self.merge_channels_row.setSpacing(7)
+        channel_layout.addLayout(self.merge_channels_row)
+        preview_label = QLabel("散点预览")
+        preview_label.setObjectName("muted")
+        channel_layout.addWidget(preview_label)
+        self.preview_channels_row = QHBoxLayout()
+        self.preview_channels_row.setSpacing(7)
+        channel_layout.addLayout(self.preview_channels_row)
+        config_hint = QLabel("通道勾选会自动保存到用户配置")
+        config_hint.setObjectName("muted")
+        channel_layout.addWidget(config_hint)
         left.addWidget(self.channel_card)
 
         result_card = QFrame()
@@ -486,6 +502,11 @@ class MainWindow(QMainWindow):
         self.result_hint.setObjectName("muted")
         result_layout.addWidget(self.result_hint)
 
+        self.preview_tabs = QTabWidget()
+        self.preview_tabs.setObjectName("previewTabs")
+        self.preview_tabs.setDocumentMode(True)
+        self.plot_preview = PlotPreviewWidget()
+        self.preview_tabs.addTab(self.plot_preview, "数据散点")
         self.preview = QPlainTextEdit()
         self.preview.setObjectName("preview")
         self.preview.setReadOnly(True)
@@ -500,7 +521,8 @@ class MainWindow(QMainWindow):
         self.preview.setTabStopDistance(
             QFontMetrics(preview_font).horizontalAdvance(" ") * 8
         )
-        result_layout.addWidget(self.preview, 1)
+        self.preview_tabs.addTab(self.preview, "合并数据")
+        result_layout.addWidget(self.preview_tabs, 1)
         self.error_label = QLabel()
         self.error_label.setObjectName("error")
         self.error_label.setWordWrap(True)
@@ -571,7 +593,6 @@ class MainWindow(QMainWindow):
             else "CHI 电化学 → 自动识别横坐标 → 精确并集"
         )
         self.drop_zone.set_mode(data_type)
-        self.channel_card.setVisible(data_type == "cd")
         self.formula_button.setVisible(data_type == "cd")
         self.files_hint.setText(
             "勾选的文件参与合并；第一份对应 CD1 / HT1 / Abs1"
@@ -600,6 +621,128 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._apply_data_type(data_type)
         self._refresh_recent_projects()
+
+    def _available_channels(self, role: str = "merge") -> tuple[str, ...]:
+        if self.data_type == "cd":
+            return (
+                CD_MERGE_DEFAULT
+                if role == "merge"
+                else tuple(dict.fromkeys((*CD_MERGE_DEFAULT, "G")))
+            )
+        available: list[str] = []
+        for entry in self.entries:
+            if isinstance(entry.dataset, ElectrochemSignal):
+                available.extend(entry.dataset.channel_names)
+        return tuple(dict.fromkeys(available))
+
+    def _selected_channel_names(self, role: str) -> tuple[str, ...]:
+        available = self._available_channels(role)
+        if self.data_type == "cd":
+            configured = (
+                self.user_config.cd_merge_channels
+                if role == "merge"
+                else self.user_config.cd_preview_channels
+            )
+            configured_set = set(configured)
+            return tuple(name for name in available if name in configured_set)
+        configured = (
+            self.user_config.electrochem_merge_channels
+            if role == "merge"
+            else self.user_config.electrochem_preview_channels
+        )
+        return selected_channels(available, configured, default_all=True)
+
+    def _clear_layout(self, layout: QHBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _sync_channel_controls(self) -> None:
+        available = self._available_channels("merge")
+        merge_selected = set(self._selected_channel_names("merge"))
+        preview_selected = set(self._selected_channel_names("preview"))
+        self.merge_channel_checks = {}
+        self.preview_channel_checks = {}
+        self._clear_layout(self.merge_channels_row)
+        self._clear_layout(self.preview_channels_row)
+        for name in available:
+            check = QCheckBox(name)
+            check.setObjectName("channelCheck")
+            check.setChecked(name in merge_selected)
+            check.toggled.connect(
+                lambda checked, channel=name: self._channel_setting_changed(
+                    "merge", channel, checked
+                )
+            )
+            self.merge_channel_checks[name] = check
+            self.merge_channels_row.addWidget(check)
+        if not available:
+            empty = QLabel("添加数据后显示")
+            empty.setObjectName("muted")
+            self.merge_channels_row.addWidget(empty)
+        self.merge_channels_row.addStretch(1)
+
+        preview_available = self._available_channels("preview")
+        for name in preview_available:
+            if self.data_type == "cd" and name == "G":
+                label = "G 因子"
+            else:
+                label = name
+            check = QCheckBox(label)
+            check.setObjectName("channelCheck")
+            check.setChecked(name in preview_selected)
+            check.toggled.connect(
+                lambda checked, channel=name: self._channel_setting_changed(
+                    "preview", channel, checked
+                )
+            )
+            self.preview_channel_checks[name] = check
+            self.preview_channels_row.addWidget(check)
+        if not preview_available:
+            empty = QLabel("添加数据后显示")
+            empty.setObjectName("muted")
+            self.preview_channels_row.addWidget(empty)
+        self.preview_channels_row.addStretch(1)
+
+    def _channel_setting_changed(
+        self, role: str, channel: str, checked: bool
+    ) -> None:
+        checks = (
+            self.merge_channel_checks
+            if role == "merge"
+            else self.preview_channel_checks
+        )
+        selected = [
+            name for name, check in checks.items() if check.isChecked()
+        ]
+        if role == "merge" and not selected:
+            blocker = QSignalBlocker(checks[channel])
+            checks[channel].setChecked(True)
+            del blocker
+            QMessageBox.information(
+                self, "合并通道", "至少要保留一个合并/导出通道。"
+            )
+            return
+        field = (
+            "cd_merge_channels"
+            if self.data_type == "cd" and role == "merge"
+            else "cd_preview_channels"
+            if self.data_type == "cd"
+            else "electrochem_merge_channels"
+            if role == "merge"
+            else "electrochem_preview_channels"
+        )
+        self.user_config = with_channels(self.user_config, field, selected)
+        try:
+            save_user_config(self.config_path, self.user_config)
+        except OSError as exc:
+            self._show_error(f"无法保存用户配置：{exc}")
+        if role == "merge":
+            self._schedule_merge()
+        else:
+            self._update_plot_preview()
 
     def _choose_files(self) -> None:
         initial = (
@@ -716,6 +859,7 @@ class MainWindow(QMainWindow):
         del blocker
         self._refreshing_table = False
         self.count_badge.setText(f"{len(self.entries)} 个文件")
+        self._sync_channel_controls()
 
     def _file_item_changed(self, item: QTableWidgetItem) -> None:
         if self._refreshing_table or item.column() != 0:
@@ -790,14 +934,6 @@ class MainWindow(QMainWindow):
         self._schedule_merge()
         self._update_window_title()
 
-    def _channels_changed(self) -> None:
-        if not any(check.isChecked() for check in self.channel_checks.values()):
-            self.channel_checks["CD"].setChecked(True)
-            QMessageBox.information(self, "输出通道", "至少要保留一个输出通道。")
-        self._dirty = True
-        self._update_window_title()
-        self._schedule_merge()
-
     def _schedule_merge(self) -> None:
         self._merge_timer.start()
 
@@ -814,6 +950,7 @@ class MainWindow(QMainWindow):
             self._set_preview(
                 "添加原始 TXT 后，这里会显示完整合并结果。"
             )
+            self.plot_preview.set_graphs(())
             self._set_actions_enabled(False)
             return
         try:
@@ -823,7 +960,12 @@ class MainWindow(QMainWindow):
                         entry.dataset
                         for entry in selected
                         if isinstance(entry.dataset, ElectrochemSignal)
-                    ]
+                    ],
+                    channels=[
+                        name
+                        for name, check in self.merge_channel_checks.items()
+                        if check.isChecked()
+                    ],
                 )
             else:
                 result = merge_exact_union(
@@ -834,7 +976,7 @@ class MainWindow(QMainWindow):
                     ],
                     [
                         name
-                        for name, check in self.channel_checks.items()
+                        for name, check in self.merge_channel_checks.items()
                         if check.isChecked()
                     ],
                 )
@@ -842,6 +984,7 @@ class MainWindow(QMainWindow):
             self.result = None
             self.status_label.setText("无法生成合并结果")
             self._set_preview("")
+            self.plot_preview.set_graphs(())
             self._set_actions_enabled(False)
             self._show_error(str(exc))
             return
@@ -858,11 +1001,27 @@ class MainWindow(QMainWindow):
             f"{result.participating_files} 个文件参与合并{skipped_text}"
         )
         self._set_preview(result.text)
+        self._update_plot_preview()
         self._set_actions_enabled(True)
 
     def _set_preview(self, text: str) -> None:
         self.preview.setPlainText(text)
         self.preview.moveCursor(QTextCursor.MoveOperation.Start)
+
+    def _update_plot_preview(self) -> None:
+        if self.result is None:
+            self.plot_preview.set_graphs(())
+            return
+        enabled = [
+            name
+            for name, check in self.preview_channel_checks.items()
+            if check.isChecked()
+        ]
+        if isinstance(self.result, MergeResult):
+            graphs = cd_plot_graphs(self.result, enabled)
+        else:
+            graphs = electrochem_plot_graphs(self.result, enabled)
+        self.plot_preview.set_graphs(graphs)
 
     def _set_actions_enabled(self, enabled: bool) -> None:
         self.copy_button.setEnabled(enabled)
@@ -1213,7 +1372,7 @@ QLabel#muted {
     color: #64748b;
     font-size: 12px;
 }
-QLabel#badge, QLabel#smallBadge, QLabel#pill {
+QLabel#smallBadge, QLabel#pill {
     background: #eff6ff;
     color: #1d4ed8;
     border: 1px solid #dbeafe;
@@ -1323,6 +1482,35 @@ QPlainTextEdit#preview {
     border-radius: 9px;
     padding: 9px;
     selection-background-color: #dbeafe;
+}
+QTabWidget#previewTabs::pane {
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #fbfcfe;
+    top: -1px;
+}
+QTabWidget#previewTabs QTabBar::tab {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 4px 12px;
+    margin-right: 2px;
+}
+QTabWidget#previewTabs QTabBar::tab:selected {
+    background: #ffffff;
+    color: #1d4ed8;
+}
+QScrollArea#plotPreview, QWidget#plotHost {
+    background: transparent;
+    border: none;
+}
+QFrame#plotCard {
+    background: #ffffff;
+    border: 1px solid #e6edf5;
+    border-radius: 10px;
 }
 QCheckBox {
     color: #334155;

@@ -101,6 +101,7 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
             "participating_files": result.participating_files,
             "clipboard_data_ok": clipboard_data_ok,
             "preview_chars": len(window.preview.toPlainText()),
+            "plot_count": len(window.plot_preview.plots),
             "ready_seconds": round(time.perf_counter() - STARTED_AT, 3),
         }
         if data_type == "cd":

@@ -1,6 +1,6 @@
 # SignalWeave
 
-本地运行的 CD 光谱与 CHI 电化学数据合并工具。输出面向 Origin 的制表符宽表，不插值、不补造测量点。
+本地运行的 CD 光谱与 CHI 电化学数据处理工具。将原始 TXT 合并为面向 Origin 的精确并集宽表，不插值、不补造测量点，不上传实验数据。
 
 ![SignalWeave 界面](ui-preview.png)
 
@@ -134,3 +134,7 @@ release\SignalWeave Win11 x64.zip
 ```
 
 默认使用本机自签名证书。该签名可验证文件签名后未被修改，但不会自动获得公共 CA 或 SmartScreen 信任。
+
+## 许可证
+
+本项目采用 [PolyForm Noncommercial 1.0.0](LICENSE) 许可证，允许非商业使用、修改和分发，禁止商业用途。该许可证属于源码公开（source-available）许可，并非 OSI 定义的开源许可证。

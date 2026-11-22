@@ -1,16 +1,36 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments
 .qt-env/
 .venv/
+venv/
+
+# Build output
 .build-temp/
 .pyinstaller-cache/
 build/
 dist/
 release/
+*.spec
 .verify_*
-SignalWeave-recent.json
-SignalWeave-config.json
-SignalWeave-error.log
 verify-and-build.log
 verify-and-build.status.json
-*.spec
+
+# Runtime state
+SignalWeave-config.json
+SignalWeave-recent.json
+SignalWeave-error.log
+*.tmp
+
+# Editors and OS files
+.idea/
+.vscode/
+.DS_Store
+Desktop.ini
+Thumbs.db

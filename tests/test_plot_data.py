@@ -41,6 +41,16 @@ class PlotDataTests(unittest.TestCase):
             ["Current1", "Current2"],
         )
 
+    def test_cv_preview_preserves_original_scan_order(self) -> None:
+        result = merge_electrochem([read_electrochem(FIXTURES / "CV_LOOP.txt")])
+        graph = electrochem_plot_graphs(result, ("Current",))[0]
+        series = graph.series[0]
+        self.assertEqual(series.x, (-0.1, 0.0, 0.1, 0.0, -0.1))
+        self.assertEqual(
+            series.y,
+            (1.0e-6, 2.0e-6, 3.0e-6, 4.0e-6, 5.0e-6),
+        )
+
     def test_preview_channel_filter_is_respected(self) -> None:
         result = merge_electrochem([read_electrochem(FIXTURES / "OER_A.txt")])
         self.assertEqual(electrochem_plot_graphs(result, ()), ())

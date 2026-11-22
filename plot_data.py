@@ -109,12 +109,14 @@ def electrochem_plot_graphs(
         for descriptor in result.series:
             if descriptor.channel != channel:
                 continue
-            index = result.header.index(descriptor.header)
-            values = _series_values(
-                result.rows, 0, index, descriptor.header
-            )
-            if values is not None:
-                series.append(values)
+            if descriptor.plot_x and descriptor.plot_y:
+                series.append(
+                    ScatterSeries(
+                        name=descriptor.header,
+                        x=descriptor.plot_x,
+                        y=descriptor.plot_y,
+                    )
+                )
         if series:
             graphs.append(
                 ScatterGraph(

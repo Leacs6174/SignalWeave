@@ -274,6 +274,9 @@ class ElectrochemSeries:
     channel: str
     header: str
     file_index: int
+    # Export rows are sorted by x for Origin; CV previews need acquisition order.
+    plot_x: tuple[float, ...]
+    plot_y: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -392,6 +395,10 @@ def merge_electrochem(
                     channel=channel,
                     header=header_name,
                     file_index=file_index,
+                    plot_x=signal.x_values,
+                    plot_y=tuple(
+                        float(value) for value in signal.channels[channel]
+                    ),
                 )
             )
 

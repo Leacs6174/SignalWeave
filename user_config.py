@@ -126,7 +126,7 @@ def save_user_config(path: str | Path, config: UserConfig) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "format": "DataMergerUserConfig",
+        "format": "SignalWeaveUserConfig",
         "version": 1,
         "cd_merge_channels": list(config.cd_merge_channels),
         "cd_preview_channels": list(config.cd_preview_channels),

@@ -1,4 +1,4 @@
-# DataMerger UI Design Rules
+# SignalWeave UI Design Rules
 
 This project uses PySide6 6.12 Qt Widgets, Qt Fusion, QSS, and custom
 `QPainter` charts. The rules below are mandatory for UI changes.

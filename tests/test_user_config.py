@@ -41,7 +41,7 @@ class UserConfigTests(unittest.TestCase):
         )
 
     def test_round_trip_keeps_merge_and_preview_channels(self) -> None:
-        path = self.root / "DataMerger-config.json"
+        path = self.root / "SignalWeave-config.json"
         expected = UserConfig(
             cd_merge_channels=("CD", "Abs"),
             cd_preview_channels=("CD", "HT", "G"),

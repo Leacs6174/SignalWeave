@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "EXE 构建失败，退出码 $LASTEXITCODE"
 }
 
-$exe = Join-Path $PSScriptRoot "dist\DataMerger\DataMerger.exe"
+$exe = Join-Path $PSScriptRoot "dist\SignalWeave\SignalWeave.exe"
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "构建结束但未找到 $exe"
 }

@@ -1,4 +1,4 @@
-"""Qt user interface for DataMerger."""
+"""Qt user interface for SignalWeave."""
 
 from __future__ import annotations
 
@@ -64,6 +64,7 @@ from electrochem_core import (
     read_electrochem,
 )
 from project_io import (
+    LEGACY_PROJECT_EXTENSIONS,
     PROJECT_EXTENSION,
     ProjectError,
     ProjectFile,
@@ -344,8 +345,8 @@ class MainWindow(QMainWindow):
         self._refreshing_recent = False
         self.merge_channel_checks: dict[str, QCheckBox] = {}
         self.preview_channel_checks: dict[str, QCheckBox] = {}
-        self.recent_config = _application_dir() / "DataMerger-recent.json"
-        self.config_path = _application_dir() / "DataMerger-config.json"
+        self.recent_config = _application_dir() / "SignalWeave-recent.json"
+        self.config_path = _application_dir() / "SignalWeave-config.json"
         self.user_config = load_user_config(self.config_path)
         self._merge_timer = QTimer(self)
         self._merge_timer.setSingleShot(True)
@@ -507,7 +508,7 @@ class MainWindow(QMainWindow):
         header.setSpacing(12)
         title_box = QVBoxLayout()
         title_box.setSpacing(1)
-        title = QLabel("DataMerger")
+        title = QLabel("SignalWeave")
         title.setObjectName("title")
         title_box.addWidget(title)
         header.addLayout(title_box)
@@ -1311,7 +1312,7 @@ class MainWindow(QMainWindow):
         project = self.project_path.name if self.project_path else "未命名工程"
         marker = " *" if self._dirty else ""
         self.setWindowTitle(
-            f"DataMerger · {DATA_TYPE_NAMES[self.data_type]} · {project}{marker}"
+            f"SignalWeave · {DATA_TYPE_NAMES[self.data_type]} · {project}{marker}"
         )
 
     def _confirm_discard(self) -> bool:
@@ -1354,9 +1355,14 @@ class MainWindow(QMainWindow):
         )
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "打开 DataMerger 工程",
+            "打开 SignalWeave 工程",
             initial,
-            f"DataMerger 工程 (*{PROJECT_EXTENSION})",
+            (
+                "SignalWeave 工程 "
+                f"(*{PROJECT_EXTENSION} "
+                + " ".join(f"*{item}" for item in LEGACY_PROJECT_EXTENSIONS)
+                + ")"
+            ),
         )
         if path:
             self._open_project(path)
@@ -1433,9 +1439,9 @@ class MainWindow(QMainWindow):
         )
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "保存 DataMerger 工程",
+            "保存 SignalWeave 工程",
             initial,
-            f"DataMerger 工程 (*{PROJECT_EXTENSION})",
+            f"SignalWeave 工程 (*{PROJECT_EXTENSION})",
         )
         if not path:
             return False

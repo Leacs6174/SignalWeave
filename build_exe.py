@@ -44,7 +44,7 @@ def main() -> int:
         "--clean",
         "--windowed",
         "--name",
-        "DataMerger",
+        "SignalWeave",
         "--distpath",
         str(ROOT / "dist"),
         "--workpath",
@@ -54,7 +54,7 @@ def main() -> int:
         str(ROOT / "app.py"),
     ]
     subprocess.run(command, cwd=ROOT, env=env, check=True)
-    exe = ROOT / "dist" / "DataMerger" / "DataMerger.exe"
+    exe = ROOT / "dist" / "SignalWeave" / "SignalWeave.exe"
     print(f"\n构建完成：{exe}")
     print(f"EXE 存在：{exe.is_file()}")
     return 0 if exe.is_file() else 2

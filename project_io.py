@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_VERSION = 1
-PROJECT_EXTENSION = ".dmproj"
+PROJECT_EXTENSION = ".swproj"
+LEGACY_PROJECT_EXTENSIONS = (".dmproj",)
+PROJECT_FORMATS = {"SignalWeaveProject", "DataMergerProject"}
 VALID_DATA_TYPES = {"cd", "electrochem"}
 
 
@@ -62,7 +64,7 @@ def save_project(
     if data_type not in VALID_DATA_TYPES:
         raise ProjectError(f"未知数据类型：{data_type}")
     payload = {
-        "format": "DataMergerProject",
+        "format": "SignalWeaveProject",
         "version": PROJECT_VERSION,
         "data_type": data_type,
         "files": [
@@ -84,9 +86,9 @@ def load_project(path: str | Path) -> ProjectDocument:
     except OSError as exc:
         raise ProjectError(f"无法读取工程文件：{exc}") from exc
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ProjectError("工程文件不是有效的 DataMerger JSON") from exc
-    if payload.get("format") != "DataMergerProject":
-        raise ProjectError("不是 DataMerger 工程文件")
+        raise ProjectError("工程文件不是有效的 SignalWeave JSON") from exc
+    if payload.get("format") not in PROJECT_FORMATS:
+        raise ProjectError("不是 SignalWeave 工程文件")
     if payload.get("version") != PROJECT_VERSION:
         raise ProjectError("工程文件版本不受支持")
     data_type = payload.get("data_type")

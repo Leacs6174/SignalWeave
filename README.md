@@ -1,12 +1,12 @@
-# DataMerger
+# SignalWeave
 
 本地运行的 CD 光谱与 CHI 电化学数据合并工具。输出面向 Origin 的制表符宽表，不插值、不补造测量点。
 
-![DataMerger 界面](ui-preview.png)
+![SignalWeave 界面](ui-preview.png)
 
 夜间模式使用纯灰阶界面；图表数据仍保留色相以区分序列。
 
-![DataMerger 夜间界面](ui-dark-preview.png)
+![SignalWeave 夜间界面](ui-dark-preview.png)
 
 ## 功能
 
@@ -45,11 +45,11 @@
 - 查看：字体、日间/夜间主题和其它渲染设置。
 - 下方“最近工程”横向标签栏，可快速切换最近打开的工程。
 
-工程文件使用 `.dmproj`，本质是可读 JSON。只保存源文件绝对路径和每个文件的勾选状态，不复制源数据：
+工程文件使用 `.swproj`，本质是可读 JSON。只保存源文件绝对路径和每个文件的勾选状态，不复制源数据：
 
 ```json
 {
-  "format": "DataMergerProject",
+  "format": "SignalWeaveProject",
   "version": 1,
   "data_type": "electrochem",
   "files": [
@@ -61,11 +61,11 @@
 }
 ```
 
-最近工程索引保存在程序同目录的 `DataMerger-recent.json`。程序不向用户目录或 C 盘写入工程缓存。
+最近工程索引保存在程序同目录的 `SignalWeave-recent.json`。程序不向用户目录或 C 盘写入工程缓存。
 
 ## 用户通道配置
 
-“合并 / 导出”和“图表预览”的通道勾选会自动保存到程序同目录的 `DataMerger-config.json`。该配置跨工程复用，不写入工程文件或 C 盘用户目录。
+“合并 / 导出”和“图表预览”的通道勾选会自动保存到程序同目录的 `SignalWeave-config.json`。该配置跨工程复用，不写入工程文件或 C 盘用户目录。
 
 默认值：
 
@@ -91,7 +91,7 @@
 [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)。主题入口统一为 `theme.apply_theme()`。
 
 ```powershell
-Set-Location 'F:\coding\DataMerger'
+Set-Location 'F:\coding\SignalWeave'
 & 'F:\coding\python3\python3itself\python.exe' -m venv .venv
 & '.\.venv\Scripts\python.exe' -m pip install -r requirements-build.txt
 ```
@@ -118,7 +118,7 @@ $env:QT_QPA_PLATFORM = 'offscreen'
 构建产物：
 
 ```text
-dist\DataMerger\DataMerger.exe
+dist\SignalWeave\SignalWeave.exe
 ```
 
 生成便携分发包：
@@ -130,7 +130,7 @@ dist\DataMerger\DataMerger.exe
 输出：
 
 ```text
-release\DataMerger Win11 x64.zip
+release\SignalWeave Win11 x64.zip
 ```
 
 默认使用本机自签名证书。该签名可验证文件签名后未被修改，但不会自动获得公共 CA 或 SmartScreen 信任。

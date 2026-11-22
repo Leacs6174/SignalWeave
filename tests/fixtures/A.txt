@@ -1,5 +1,5 @@
 Sample Name	A
-Comment	DataMerger fixture
+Comment	SignalWeave fixture
 XYDATA
 900.00	1.2300	10.10	0.1010
 899.50	2.0000	20.20	0.2020

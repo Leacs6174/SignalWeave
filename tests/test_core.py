@@ -23,7 +23,7 @@ def write_raw(
     path = directory / name
     lines = [
         "Sample Name\t测试样品",
-        "Comment\tDataMerger test",
+        "Comment\tSignalWeave test",
     ]
     for _ in range(blocks):
         lines.append("XYDATA")

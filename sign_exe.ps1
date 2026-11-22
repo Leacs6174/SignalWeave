@@ -1,10 +1,10 @@
 param(
     [Parameter(Mandatory = $false)]
-    [string]$Executable = (Join-Path $PSScriptRoot "dist\DataMerger\DataMerger.exe")
+    [string]$Executable = (Join-Path $PSScriptRoot "dist\SignalWeave\SignalWeave.exe")
 )
 
 $ErrorActionPreference = "Stop"
-$subject = "CN=DataMerger, O=Local Build, OU=Desktop Utility"
+$subject = "CN=SignalWeave, O=Local Build, OU=Desktop Utility"
 $certificate = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert |
     Where-Object { $_.Subject -eq $subject -and $_.HasPrivateKey } |
     Sort-Object NotAfter -Descending |
@@ -35,7 +35,7 @@ $publicDir = Join-Path $PSScriptRoot "signing"
 New-Item -ItemType Directory -Path $publicDir -Force | Out-Null
 Export-Certificate `
     -Cert $certificate `
-    -FilePath (Join-Path $publicDir "DataMerger.cer") `
+    -FilePath (Join-Path $publicDir "SignalWeave.cer") `
     -Type CERT | Out-Null
 
 $verified = Get-AuthenticodeSignature -LiteralPath $Executable

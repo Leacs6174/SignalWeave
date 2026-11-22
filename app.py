@@ -1,4 +1,4 @@
-"""DataMerger application entry point."""
+"""SignalWeave application entry point."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ _trace("after all imports")
 
 
 def _exception_hook(exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
-    path = _application_dir() / "DataMerger-error.log"
+    path = _application_dir() / "SignalWeave-error.log"
     try:
         path.write_text(
             "".join(traceback.format_exception(exc_type, exc, tb)),
@@ -55,7 +55,7 @@ def _exception_hook(exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
 
 
 def _apply_saved_theme(app: QApplication) -> None:
-    config = load_user_config(_application_dir() / "DataMerger-config.json")
+    config = load_user_config(_application_dir() / "SignalWeave-config.json")
     apply_theme(
         app,
         APP_STYLE,
@@ -80,8 +80,8 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     app = QApplication(sys.argv[:1])
     _trace("QApplication created")
-    app.setApplicationName("DataMerger")
-    app.setOrganizationName("DataMerger")
+    app.setApplicationName("SignalWeave")
+    app.setOrganizationName("SignalWeave")
     _apply_saved_theme(app)
     window = MainWindow()
     _trace("MainWindow created")
@@ -183,8 +183,8 @@ def main() -> int:
 
     sys.excepthook = _exception_hook
     app = QApplication(sys.argv)
-    app.setApplicationName("DataMerger")
-    app.setOrganizationName("DataMerger")
+    app.setApplicationName("SignalWeave")
+    app.setOrganizationName("SignalWeave")
     _apply_saved_theme(app)
     window = MainWindow()
     window.show()

@@ -1,8 +1,8 @@
-DataMerger for Windows 11 x64
+SignalWeave for Windows 11 x64
 
 启动：
-1. 双击“DataMerger.exe”；
-2. 或双击“启动 DataMerger.bat”。
+1. 双击“SignalWeave.exe”；
+2. 或双击“启动 SignalWeave.bat”。
 
 数据：
 - CD 光谱只读取 JASCO 原始 TXT。
@@ -10,7 +10,7 @@ DataMerger for Windows 11 x64
 - 拖入 BIN 等非 TXT 文件会被忽略。
 
 工程：
-- “文件”菜单可新建、打开、保存和关闭 .dmproj 工程。
+- “文件”菜单可新建、打开、保存和关闭 .swproj 工程。
 - 工程只记录源文件路径和勾选状态，不包含源数据。
 - “最近工程”可直接切换最近使用的工程。
 
@@ -21,7 +21,7 @@ DataMerger for Windows 11 x64
 图表预览：
 - “数据图”页按最终合并表绘制图形预览。
 - CD 默认显示 CD 和 G 因子；电化学默认显示全部通道。
-- 合并/导出与预览通道可分别勾选，并自动保存到同目录的 DataMerger-config.json。
+- 合并/导出与预览通道可分别勾选，并自动保存到同目录的 SignalWeave-config.json。
 - 在绘图区框选可缩放双轴；拖动横轴或纵轴可单轴缩放。
 - 点击“复位”恢复所有图表的原始范围。
 - 左右功能区和左侧上下区域之间的分隔条可拖动调整大小。

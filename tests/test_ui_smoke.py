@@ -215,6 +215,7 @@ class UiSmokeTests(unittest.TestCase):
         self.app.processEvents()
 
     def test_toolbar_and_electrochem_mode(self) -> None:
+        self.assertIn("SignalWeave", self.window.windowTitle())
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
         self.assertIsInstance(self.window.recent_tabs, QTabBar)
         self.assertIsInstance(self.window.content_splitter, QSplitter)
@@ -349,7 +350,7 @@ class UiSmokeTests(unittest.TestCase):
         )
         self.window.entries[1].enabled = False
         self.window._refresh_table()
-        self.window.project_path = Path(self.temp.name) / "ui-test.dmproj"
+        self.window.project_path = Path(self.temp.name) / "ui-test.swproj"
         self.assertTrue(self.window._save_project())
         self.assertFalse(self.window._dirty)
         self.assertEqual(self.window.recent_tabs.count(), 1)
@@ -364,12 +365,12 @@ class UiSmokeTests(unittest.TestCase):
         self.assertEqual([entry.enabled for entry in self.window.entries], [True, False])
         self.assertEqual(
             self.window.project_path,
-            (Path(self.temp.name) / "ui-test.dmproj").resolve(),
+            (Path(self.temp.name) / "ui-test.swproj").resolve(),
         )
 
     def test_recent_tabs_switch_between_projects(self) -> None:
-        first = Path(self.temp.name) / "first.dmproj"
-        second = Path(self.temp.name) / "second.dmproj"
+        first = Path(self.temp.name) / "first.swproj"
+        second = Path(self.temp.name) / "second.swproj"
         self.window._add_paths([str(FIXTURES / "A.txt")])
         self.window.project_path = first
         self.assertTrue(self.window._save_project())

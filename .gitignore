@@ -8,9 +8,9 @@ build/
 dist/
 release/
 .verify_*
-DataMerger-recent.json
-DataMerger-config.json
-DataMerger-error.log
+SignalWeave-recent.json
+SignalWeave-config.json
+SignalWeave-error.log
 verify-and-build.log
 verify-and-build.status.json
 *.spec

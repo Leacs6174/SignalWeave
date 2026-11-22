@@ -7,8 +7,9 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QMimeData, QPointF, Qt, QUrl  # noqa: E402
+from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
+from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication, QLabel, QTabBar, QWidget  # noqa: E402
 
 from app import MainWindow  # noqa: E402
@@ -142,6 +143,49 @@ class UiSmokeTests(unittest.TestCase):
         self.assertIn("HT", config.cd_preview_channels)
         self.assertEqual(set(config.cd_preview_channels), {"CD", "G", "HT"})
         self.assertEqual(len(self.window.plot_preview.plots), 3)
+
+    def test_plot_drag_zoom_and_reset_button(self) -> None:
+        self.window._add_paths(
+            [str(FIXTURES / "A.txt"), str(FIXTURES / "B.txt")]
+        )
+        self.window._recompute_merge()
+        self.window.show()
+        self.app.processEvents()
+        plot = self.window.plot_preview.plots[0]
+        initial_x = plot.view_x_range
+        initial_y = plot.view_y_range
+        rect = plot._plot_rect()
+        start = QPoint(int(rect.left() + 80), int(rect.bottom() + 10))
+        end = QPoint(int(rect.left() + 260), int(rect.bottom() + 10))
+        QTest.mousePress(plot, Qt.MouseButton.LeftButton, pos=start)
+        QTest.mouseMove(plot, end)
+        QTest.mouseRelease(plot, Qt.MouseButton.LeftButton, pos=end)
+        self.app.processEvents()
+        self.assertTrue(plot.is_zoomed())
+        self.assertNotEqual(plot.view_x_range, initial_x)
+        self.assertEqual(plot.view_y_range, initial_y)
+        self.assertTrue(self.window.plot_preview.reset_button.isEnabled())
+
+        self.window.plot_preview.reset_button.click()
+        self.app.processEvents()
+        self.assertFalse(plot.is_zoomed())
+        self.assertEqual(plot.view_x_range, initial_x)
+        self.assertEqual(plot.view_y_range, initial_y)
+        self.assertFalse(self.window.plot_preview.reset_button.isEnabled())
+
+        y_start = QPoint(int(rect.left() - 20), int(rect.top() + 60))
+        y_end = QPoint(int(rect.left() - 20), int(rect.top() + 180))
+        QTest.mousePress(plot, Qt.MouseButton.LeftButton, pos=y_start)
+        QTest.mouseMove(plot, y_end)
+        QTest.mouseRelease(plot, Qt.MouseButton.LeftButton, pos=y_end)
+        self.app.processEvents()
+        self.assertTrue(plot.is_zoomed())
+        self.assertEqual(plot.view_x_range, initial_x)
+        self.assertNotEqual(plot.view_y_range, initial_y)
+        self.window.plot_preview.reset_zoom()
+        self.window._dirty = False
+        self.window.close()
+        self.app.processEvents()
 
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())

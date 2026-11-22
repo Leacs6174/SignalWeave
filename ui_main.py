@@ -933,6 +933,7 @@ class MainWindow(QMainWindow):
         self._merge_timer.start()
 
     def _recompute_merge(self) -> None:
+        self._merge_timer.stop()
         selected = [
             entry for entry in self.entries if entry.enabled and entry.dataset is not None
         ]

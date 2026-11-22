@@ -54,6 +54,8 @@ This project uses PySide6 6.12 Qt Widgets, Qt Fusion, QSS, and custom
 - Preview data must come from exported values, not interpolated source points.
 - CD defaults to `CD` and `G`; electrochemical data defaults to all discovered
   channels.
+- Every interactive chart must provide a visible reset action. Drag-to-zoom
+  must preserve the original data ranges so reset is lossless.
 
 ## Optional Frosted Appearance
 

@@ -31,6 +31,7 @@ if "--smoke-test" in sys.argv:
         _trace("module start")
 
 _trace("before PySide6 import")
+from PySide6.QtCore import QRectF  # noqa: E402
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -74,6 +75,8 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
     _trace("MainWindow created")
     report: dict[str, object] = {"ok": False}
     try:
+        window.show()
+        app.processEvents()
         window._apply_data_type(data_type)
         window._add_paths(paths)
         _trace("paths added")
@@ -90,9 +93,37 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
             window._copy_formulas()
             formula = getattr(result, "formula_text", "")
             formula_ok = QGuiApplication.clipboard().text() == formula
+        zoom_ok = False
+        reset_ok = False
+        if window.plot_preview.plots:
+            plot = window.plot_preview.plots[0]
+            plot_rect = plot._plot_rect()
+            selection = QRectF(
+                plot_rect.left() + plot_rect.width() * 0.2,
+                plot_rect.top() + plot_rect.height() * 0.2,
+                plot_rect.width() * 0.5,
+                plot_rect.height() * 0.5,
+            )
+            plot._apply_zoom(selection, "xy")
+            app.processEvents()
+            zoom_ok = (
+                plot.is_zoomed()
+                and window.plot_preview.reset_button.isEnabled()
+            )
+            window.plot_preview.reset_button.click()
+            app.processEvents()
+            reset_ok = (
+                not plot.is_zoomed()
+                and not window.plot_preview.reset_button.isEnabled()
+            )
         _trace("clipboard verified")
         report = {
-            "ok": clipboard_data_ok and formula_ok is not False,
+            "ok": (
+                clipboard_data_ok
+                and formula_ok is not False
+                and zoom_ok
+                and reset_ok
+            ),
             "data_type": data_type,
             "rows": result.row_count,
             "columns": result.column_count,
@@ -101,6 +132,8 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
             "clipboard_data_ok": clipboard_data_ok,
             "preview_chars": len(window.preview.toPlainText()),
             "plot_count": len(window.plot_preview.plots),
+            "plot_zoom_ok": zoom_ok,
+            "plot_reset_ok": reset_ok,
             "ready_seconds": round(time.perf_counter() - STARTED_AT, 3),
         }
         if data_type == "cd":

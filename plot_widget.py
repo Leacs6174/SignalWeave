@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPen, QPolygonF
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPixmap,
+    QPolygonF,
+)
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -33,6 +41,31 @@ def _format_tick(value: float) -> str:
     return f"{value:.4g}"
 
 
+class _SelectionOverlay(QWidget):
+    """Draw only the rubber band so mouse movement never repaints the chart."""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self._selection: QRectF | None = None
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+
+    def set_selection(self, selection: QRectF | None) -> None:
+        self._selection = selection
+        self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        del event
+        if self._selection is None:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor("#2563eb"), 1.2, Qt.PenStyle.DashLine))
+        painter.setBrush(QColor(37, 99, 235, 32))
+        painter.drawRect(self._selection)
+
+
 class ScatterPlot(QWidget):
     zoomChanged = Signal(bool)
 
@@ -59,6 +92,10 @@ class ScatterPlot(QWidget):
         self._drag_start: QPointF | None = None
         self._drag_mode = ""
         self._selection: QRectF | None = None
+        self._static_cache: QPixmap | None = None
+        self._selection_overlay = _SelectionOverlay(self)
+        self._selection_overlay.setGeometry(self.rect())
+        self._selection_overlay.show()
 
     def sizeHint(self) -> QSize:
         return QSize(520, 260)
@@ -126,6 +163,7 @@ class ScatterPlot(QWidget):
         self._view_x = self._full_x
         self._view_y = self._full_y
         self._selection = None
+        self._static_cache = None
         self.update()
         self.zoomChanged.emit(False)
 
@@ -175,7 +213,8 @@ class ScatterPlot(QWidget):
             self._selection = self._selection_rect(
                 self._drag_start, event.position(), self._drag_mode
             )
-            self.update()
+            self._selection_overlay.set_selection(self._selection)
+            self._selection_overlay.raise_()
             event.accept()
             return
         mode = self._press_mode(event.position())
@@ -201,6 +240,7 @@ class ScatterPlot(QWidget):
             self._drag_start = None
             self._drag_mode = ""
             self._selection = None
+            self._selection_overlay.set_selection(None)
             if selection.width() >= 5 or selection.height() >= 5:
                 self._apply_zoom(selection, mode)
             self.update()
@@ -219,6 +259,7 @@ class ScatterPlot(QWidget):
             second = self._pixel_to_y(selection.bottom())
             if abs(second - first) > 1e-15:
                 self._view_y = (min(first, second), max(first, second))
+        self._static_cache = None
         self.update()
         self.zoomChanged.emit(self.is_zoomed())
 
@@ -227,9 +268,30 @@ class ScatterPlot(QWidget):
             self.unsetCursor()
         super().leaveEvent(event)
 
+    def resizeEvent(self, event) -> None:  # type: ignore[no-untyped-def]
+        super().resizeEvent(event)
+        self._static_cache = None
+        self._selection_overlay.setGeometry(self.rect())
+        self._selection_overlay.raise_()
+
     def paintEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         del event
+        if self._static_cache is None:
+            ratio = self.devicePixelRatioF()
+            cache = QPixmap(
+                max(1, int(self.width() * ratio)),
+                max(1, int(self.height() * ratio)),
+            )
+            cache.setDevicePixelRatio(ratio)
+            cache.fill(Qt.GlobalColor.transparent)
+            cache_painter = QPainter(cache)
+            self._paint_static(cache_painter)
+            cache_painter.end()
+            self._static_cache = cache
         painter = QPainter(self)
+        painter.drawPixmap(0, 0, self._static_cache)
+
+    def _paint_static(self, painter: QPainter) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         bounds = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
         painter.setPen(QPen(QColor("#e2e8f0"), 1))
@@ -333,12 +395,6 @@ class ScatterPlot(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(legend_x + 4, 34), 3.2, 3.2)
             legend_x += legend_width
-
-        if self._selection is not None:
-            painter.setPen(QPen(QColor("#2563eb"), 1.2, Qt.PenStyle.DashLine))
-            painter.setBrush(QColor(37, 99, 235, 32))
-            painter.drawRect(self._selection)
-
 
 class PlotPreviewWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:

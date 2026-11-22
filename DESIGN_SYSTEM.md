@@ -36,6 +36,8 @@ This project uses PySide6 6.12 Qt Widgets, Qt Fusion, QSS, and custom
   the popup receives its own explicit palette and QSS colors.
 - Avoid fully transparent top-level windows unless a DWM backdrop is
   intentionally implemented and tested.
+- Major functional areas use draggable `QSplitter` handles; sizes must remain
+  useful and children must not be collapsible.
 
 ## Layout And Typography
 
@@ -56,6 +58,8 @@ This project uses PySide6 6.12 Qt Widgets, Qt Fusion, QSS, and custom
   channels.
 - Every interactive chart must provide a visible reset action. Drag-to-zoom
   must preserve the original data ranges so reset is lossless.
+- Rubber-band feedback must use a lightweight overlay and cached static chart
+  image; mouse movement must not redraw thousands of scatter points.
 
 ## Optional Frosted Appearance
 

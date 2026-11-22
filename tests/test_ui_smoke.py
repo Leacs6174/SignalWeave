@@ -10,7 +10,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
-from PySide6.QtWidgets import QApplication, QLabel, QTabBar, QWidget  # noqa: E402
+from PySide6.QtWidgets import (  # noqa: E402
+    QApplication,
+    QLabel,
+    QSplitter,
+    QTabBar,
+    QWidget,
+)
 
 from app import MainWindow  # noqa: E402
 from theme import apply_theme  # noqa: E402
@@ -152,6 +158,9 @@ class UiSmokeTests(unittest.TestCase):
         self.window.show()
         self.app.processEvents()
         plot = self.window.plot_preview.plots[0]
+        self.assertFalse(plot.grab().isNull())
+        cached_plot = plot._static_cache
+        self.assertIsNotNone(cached_plot)
         initial_x = plot.view_x_range
         initial_y = plot.view_y_range
         rect = plot._plot_rect()
@@ -159,6 +168,14 @@ class UiSmokeTests(unittest.TestCase):
         end = QPoint(int(rect.left() + 260), int(rect.bottom() + 10))
         QTest.mousePress(plot, Qt.MouseButton.LeftButton, pos=start)
         QTest.mouseMove(plot, end)
+        self.app.processEvents()
+        self.assertTrue(
+            plot._selection_overlay.testAttribute(
+                Qt.WidgetAttribute.WA_TransparentForMouseEvents
+            )
+        )
+        self.assertIsNotNone(plot._selection_overlay._selection)
+        self.assertIs(plot._static_cache, cached_plot)
         QTest.mouseRelease(plot, Qt.MouseButton.LeftButton, pos=end)
         self.app.processEvents()
         self.assertTrue(plot.is_zoomed())
@@ -190,6 +207,16 @@ class UiSmokeTests(unittest.TestCase):
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
         self.assertIsInstance(self.window.recent_tabs, QTabBar)
+        self.assertIsInstance(self.window.content_splitter, QSplitter)
+        self.assertIsInstance(self.window.left_splitter, QSplitter)
+        self.assertEqual(
+            self.window.content_splitter.orientation(),
+            Qt.Orientation.Horizontal,
+        )
+        self.assertEqual(
+            self.window.left_splitter.orientation(),
+            Qt.Orientation.Vertical,
+        )
         self.assertFalse(self.window.recent_tabs.drawBase())
         self.assertTrue(
             all(
@@ -242,6 +269,19 @@ class UiSmokeTests(unittest.TestCase):
         config = load_user_config(self.window.config_path)
         self.assertEqual(config.electrochem_preview_channels, ())
         self.assertEqual(len(self.window.plot_preview.plots), 0)
+
+    def test_function_panes_are_resizable(self) -> None:
+        self.window.show()
+        self.app.processEvents()
+        self.window.content_splitter.setSizes([560, 630])
+        self.window.left_splitter.setSizes([360, 240])
+        self.app.processEvents()
+        self.assertTrue(
+            all(size > 0 for size in self.window.content_splitter.sizes())
+        )
+        self.assertTrue(
+            all(size > 0 for size in self.window.left_splitter.sizes())
+        )
 
     def test_project_round_trip_restores_disabled_file(self) -> None:
         self.window._add_paths(

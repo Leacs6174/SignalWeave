@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QTabBar,
@@ -376,12 +377,14 @@ class MainWindow(QMainWindow):
         self.drop_zone.filesDropped.connect(self._add_paths)
         outer.addWidget(self.drop_zone)
 
-        content = QHBoxLayout()
-        content.setSpacing(14)
-        outer.addLayout(content, 1)
-        left = QVBoxLayout()
-        left.setSpacing(12)
-        content.addLayout(left)
+        self.content_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.content_splitter.setObjectName("mainSplitter")
+        self.content_splitter.setChildrenCollapsible(False)
+        outer.addWidget(self.content_splitter, 1)
+        self.left_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.left_splitter.setObjectName("leftSplitter")
+        self.left_splitter.setChildrenCollapsible(False)
+        self.content_splitter.addWidget(self.left_splitter)
 
         files_card = QFrame()
         files_card.setObjectName("card")
@@ -449,7 +452,7 @@ class MainWindow(QMainWindow):
         file_actions.addStretch(1)
         file_actions.addWidget(self.clear_button)
         files_layout.addLayout(file_actions)
-        left.addWidget(files_card, 1)
+        self.left_splitter.addWidget(files_card)
 
         self.channel_card = QFrame()
         self.channel_card.setObjectName("card")
@@ -474,11 +477,16 @@ class MainWindow(QMainWindow):
         config_hint = QLabel("通道勾选会自动保存到用户配置")
         config_hint.setObjectName("muted")
         channel_layout.addWidget(config_hint)
-        left.addWidget(self.channel_card)
+        self.left_splitter.addWidget(self.channel_card)
+        self.left_splitter.setStretchFactor(0, 1)
+        self.left_splitter.setSizes([430, 190])
 
         result_card = QFrame()
         result_card.setObjectName("card")
-        content.addWidget(result_card, 1)
+        self.content_splitter.addWidget(result_card)
+        self.content_splitter.setStretchFactor(0, 0)
+        self.content_splitter.setStretchFactor(1, 1)
+        self.content_splitter.setSizes([470, 720])
         result_layout = QVBoxLayout(result_card)
         result_layout.setContentsMargins(18, 15, 18, 16)
         result_layout.setSpacing(10)
@@ -1388,6 +1396,20 @@ QFrame#card {
     background: white;
     border: 1px solid #e5eaf0;
     border-radius: 14px;
+}
+QSplitter::handle {
+    background: transparent;
+    margin: 4px;
+    border-radius: 2px;
+}
+QSplitter::handle:horizontal {
+    width: 8px;
+}
+QSplitter::handle:vertical {
+    height: 8px;
+}
+QSplitter::handle:hover {
+    background: #dbeafe;
 }
 QFrame#dropZone {
     background: #fbfdff;

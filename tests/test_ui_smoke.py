@@ -123,6 +123,7 @@ class UiSmokeTests(unittest.TestCase):
             [action.text() for action in self.window.type_menu.actions()],
             ["CD 光谱", "电化学"],
         )
+        self.assertLessEqual(self.window.file_menu.sizeHint().height(), 150)
         self.window._apply_data_type("electrochem")
         self.window._add_paths(
             [str(FIXTURES / "OER_A.txt"), str(FIXTURES / "OER_B.txt")]

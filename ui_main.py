@@ -1334,7 +1334,7 @@ QMenu {
     color: #253044;
     border: 1px solid #dfe7ef;
     border-radius: 8px;
-    padding: 5px;
+    padding: 3px;
     font-family: "Microsoft YaHei UI";
     font-size: 12px;
 }
@@ -1343,8 +1343,9 @@ QMenu::item {
     background: transparent;
     font-family: "Microsoft YaHei UI";
     font-size: 12px;
-    min-height: 20px;
-    padding: 7px 28px 7px 24px;
+    min-height: 14px;
+    padding: 3px 24px 3px 18px;
+    margin: 0px 1px;
     border-radius: 5px;
 }
 QMenu::item:selected {

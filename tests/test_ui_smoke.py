@@ -12,6 +12,8 @@ from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
 from PySide6.QtWidgets import QApplication, QLabel, QTabBar, QWidget  # noqa: E402
 
 from app import MainWindow  # noqa: E402
+from theme import apply_theme  # noqa: E402
+from ui_main import APP_STYLE  # noqa: E402
 from user_config import UserConfig, load_user_config  # noqa: E402
 
 
@@ -22,6 +24,7 @@ class UiSmokeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+        apply_theme(cls.app, APP_STYLE)
 
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -143,6 +146,13 @@ class UiSmokeTests(unittest.TestCase):
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
         self.assertIsInstance(self.window.recent_tabs, QTabBar)
+        self.assertFalse(self.window.recent_tabs.drawBase())
+        self.assertTrue(
+            all(
+                not tab_bar.drawBase()
+                for tab_bar in self.window.preview_tabs.findChildren(QTabBar)
+            )
+        )
         self.assertGreaterEqual(self.window.recent_tabs.count(), 1)
         self.assertIsNone(self.window.findChild(QWidget, "logo"))
         self.assertNotIn(

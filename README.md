@@ -72,6 +72,9 @@
 
 ## 开发环境
 
+界面颜色、字体、弹窗、标签栏、对比度与图表配色遵守
+[`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)。主题入口统一为 `theme.apply_theme()`。
+
 ```powershell
 Set-Location 'F:\coding\DataMerger'
 & 'F:\coding\python3\python3itself\python.exe' -m venv .venv

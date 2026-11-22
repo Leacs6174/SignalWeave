@@ -34,7 +34,8 @@ _trace("before PySide6 import")
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from ui_main import APP_STYLE, MainWindow, _application_dir, _font  # noqa: E402
+from theme import apply_theme  # noqa: E402
+from ui_main import APP_STYLE, MainWindow, _application_dir  # noqa: E402
 
 _trace("after all imports")
 
@@ -68,9 +69,7 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
     _trace("QApplication created")
     app.setApplicationName("DataMerger")
     app.setOrganizationName("DataMerger")
-    app.setStyle("Fusion")
-    app.setFont(_font(10))
-    app.setStyleSheet(APP_STYLE)
+    apply_theme(app, APP_STYLE)
     window = MainWindow()
     _trace("MainWindow created")
     report: dict[str, object] = {"ok": False}
@@ -141,9 +140,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("DataMerger")
     app.setOrganizationName("DataMerger")
-    app.setStyle("Fusion")
-    app.setFont(_font(10))
-    app.setStyleSheet(APP_STYLE)
+    apply_theme(app, APP_STYLE)
     window = MainWindow()
     window.show()
     return app.exec()

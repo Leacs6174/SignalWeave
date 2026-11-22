@@ -16,17 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from plot_data import ScatterGraph
-
-CHANNEL_COLORS = (
-    "#2563eb",
-    "#0f9f81",
-    "#e47524",
-    "#d9467a",
-    "#7c5ce5",
-    "#0891b2",
-    "#65a30d",
-    "#b7791f",
-)
+from theme import CHANNEL_COLORS
 
 
 def _expanded_range(low: float, high: float) -> tuple[float, float]:

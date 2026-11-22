@@ -70,6 +70,7 @@ from spectrum_core import (
     merge_exact_union,
     read_spectrum,
 )
+from theme import enforce_design_invariants, font as _font
 from user_config import (
     CD_MERGE_DEFAULT,
     CD_PREVIEW_DEFAULT,
@@ -140,13 +141,6 @@ def _icon(name: str, color: str = "#334155", size: int = 18) -> QIcon:
         painter.drawLine(8, 8, 15, 8)
     painter.end()
     return QIcon(pixmap)
-
-
-def _font(size: int, weight: QFont.Weight = QFont.Weight.Normal) -> QFont:
-    family = "Microsoft YaHei UI"
-    if family not in QFontDatabase.families():
-        family = "Segoe UI"
-    return QFont(family, size, weight)
 
 
 class DropZone(QFrame):
@@ -250,6 +244,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._build_toolbar()
         self._build_ui()
+        enforce_design_invariants(self)
         self._install_shortcuts()
         self._apply_data_type("cd")
         self._refresh_recent_projects()
@@ -1498,6 +1493,11 @@ QTabWidget#previewTabs QTabBar::tab {
     border-top-right-radius: 6px;
     padding: 4px 12px;
     margin-right: 2px;
+}
+QTabWidget#previewTabs QTabBar {
+    qproperty-drawBase: 0;
+    border: none;
+    background: transparent;
 }
 QTabWidget#previewTabs QTabBar::tab:selected {
     background: #ffffff;

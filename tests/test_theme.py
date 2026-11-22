@@ -4,7 +4,7 @@ import unittest
 
 from PySide6.QtWidgets import QApplication
 
-from theme import BASE_STYLE, apply_theme, build_palette
+from theme import BASE_STYLE, apply_theme, build_palette, colors
 
 
 def _rgb(hex_color: str) -> tuple[float, float, float]:
@@ -34,23 +34,24 @@ class ThemeTests(unittest.TestCase):
         apply_theme(cls.app, "")
 
     def test_critical_palette_pairs_meet_wcag_aa(self) -> None:
-        palette = build_palette()
-        roles = palette.ColorRole
-        pairs = (
-            (roles.WindowText, roles.Window),
-            (roles.Text, roles.Base),
-            (roles.ButtonText, roles.Button),
-            (roles.HighlightedText, roles.Highlight),
-            (roles.ToolTipText, roles.ToolTipBase),
-        )
-        for foreground_role, background_role in pairs:
-            foreground = palette.color(foreground_role).name()
-            background = palette.color(background_role).name()
-            self.assertGreaterEqual(
-                contrast(foreground, background),
-                4.5,
-                f"{foreground_role.name} on {background_role.name}",
+        for mode in ("light", "dark"):
+            palette = build_palette(mode)
+            roles = palette.ColorRole
+            pairs = (
+                (roles.WindowText, roles.Window),
+                (roles.Text, roles.Base),
+                (roles.ButtonText, roles.Button),
+                (roles.HighlightedText, roles.Highlight),
+                (roles.ToolTipText, roles.ToolTipBase),
             )
+            for foreground_role, background_role in pairs:
+                foreground = palette.color(foreground_role).name()
+                background = palette.color(background_role).name()
+                self.assertGreaterEqual(
+                    contrast(foreground, background),
+                    4.5,
+                    f"{mode}: {foreground_role.name} on {background_role.name}",
+                )
 
     def test_common_surfaces_always_define_foreground_and_background(self) -> None:
         for selector in (
@@ -71,6 +72,11 @@ class ThemeTests(unittest.TestCase):
             self.app.palette().color(self.app.palette().ColorRole.Text).name(),
             "#253044",
         )
+
+    def test_dark_mode_tokens_are_strict_grayscale(self) -> None:
+        for name, value in colors("dark").items():
+            red, green, blue = (int(value[index : index + 2], 16) for index in (1, 3, 5))
+            self.assertEqual((red, green, blue), (red, red, red), name)
 
 
 if __name__ == "__main__":

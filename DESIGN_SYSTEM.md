@@ -28,6 +28,8 @@ This project uses PySide6 6.12 Qt Widgets, Qt Fusion, QSS, and custom
 
 - Use the Fusion style so Windows dark mode cannot leak inconsistent native
   colors into the light application theme.
+- Dark mode interface tokens must be strictly grayscale (`R=G=B`). Data series
+  colors remain colorful only inside charts.
 - Every `QTabBar` must disable its native base line with
   `setDrawBase(False)`. `theme.enforce_design_invariants()` applies this to all
   tab bars when the main window is created.

@@ -37,6 +37,7 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from theme import apply_theme  # noqa: E402
 from ui_main import APP_STYLE, MainWindow, _application_dir  # noqa: E402
+from user_config import load_user_config  # noqa: E402
 
 _trace("after all imports")
 
@@ -51,6 +52,17 @@ def _exception_hook(exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
     except OSError:
         pass
     sys.__excepthook__(exc_type, exc, tb)
+
+
+def _apply_saved_theme(app: QApplication) -> None:
+    config = load_user_config(_application_dir() / "DataMerger-config.json")
+    apply_theme(
+        app,
+        APP_STYLE,
+        mode=config.theme_mode,
+        font_family=config.font_family,
+        font_size=config.font_size,
+    )
 
 
 def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
@@ -70,7 +82,7 @@ def _run_smoke_test(arguments: list[str], report_path: Path) -> int:
     _trace("QApplication created")
     app.setApplicationName("DataMerger")
     app.setOrganizationName("DataMerger")
-    apply_theme(app, APP_STYLE)
+    _apply_saved_theme(app)
     window = MainWindow()
     _trace("MainWindow created")
     report: dict[str, object] = {"ok": False}
@@ -173,7 +185,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("DataMerger")
     app.setOrganizationName("DataMerger")
-    apply_theme(app, APP_STYLE)
+    _apply_saved_theme(app)
     window = MainWindow()
     window.show()
     return app.exec()

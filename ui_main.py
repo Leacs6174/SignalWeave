@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PySide6.QtCore import QItemSelectionModel, QSignalBlocker, QSize, Qt, QTimer, Signal
@@ -17,15 +17,25 @@ from PySide6.QtGui import (
     QGuiApplication,
     QIcon,
     QPainter,
+    QPalette,
     QPen,
     QPixmap,
     QTextCursor,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
+    QFontDialog,
+    QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -60,6 +70,7 @@ from project_io import (
     load_project,
     load_recent_projects,
     record_recent_project,
+    save_recent_project_order,
     save_project,
 )
 from plot_data import cd_plot_graphs, electrochem_plot_graphs
@@ -71,10 +82,18 @@ from spectrum_core import (
     merge_exact_union,
     read_spectrum,
 )
-from theme import enforce_design_invariants, font as _font
+from theme import (
+    active_mode,
+    apply_theme,
+    colors as theme_colors,
+    enforce_design_invariants,
+    font as _font,
+)
 from user_config import (
     CD_MERGE_DEFAULT,
     CD_PREVIEW_DEFAULT,
+    DEFAULT_MARKER_SIZE,
+    DEFAULT_SERIES_COLORS,
     UserConfig,
     load_user_config,
     save_user_config,
@@ -157,12 +176,11 @@ class DropZone(QFrame):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(20, 14, 16, 14)
         layout.setSpacing(16)
-        icon_badge = QLabel()
-        icon_badge.setObjectName("dropIcon")
-        icon_badge.setFixedSize(52, 52)
-        icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_badge.setPixmap(_icon("file", "#2563eb", 27).pixmap(27, 27))
-        layout.addWidget(icon_badge)
+        self.icon_badge = QLabel()
+        self.icon_badge.setObjectName("dropIcon")
+        self.icon_badge.setFixedSize(52, 52)
+        self.icon_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.icon_badge)
         text_layout = QVBoxLayout()
         text_layout.setSpacing(3)
         self.title = QLabel()
@@ -180,6 +198,13 @@ class DropZone(QFrame):
         self.choose_button.clicked.connect(self.chooseRequested)
         layout.addWidget(self.choose_button)
         self.set_mode("cd")
+        self.refresh_theme()
+
+    def refresh_theme(self) -> None:
+        tokens = theme_colors(active_mode())
+        color = tokens["text_muted"] if active_mode() == "dark" else tokens["accent"]
+        self.icon_badge.setPixmap(_icon("file", color, 27).pixmap(27, 27))
+        self.choose_button.setIcon(_icon("add", color, 16))
 
     def set_mode(self, data_type: str) -> None:
         if data_type == "electrochem":
@@ -220,6 +245,93 @@ class DropZone(QFrame):
             event.ignore()
 
 
+class OtherSettingsDialog(QDialog):
+    def __init__(self, config: UserConfig, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("其它设置")
+        self.setMinimumWidth(430)
+        self._colors = list(config.series_colors)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.render_combo = QComboBox()
+        self.render_combo.addItem("折线图", "line")
+        self.render_combo.addItem("散点图", "scatter")
+        index = self.render_combo.findData(config.render_mode)
+        self.render_combo.setCurrentIndex(max(0, index))
+        form.addRow("渲染方式", self.render_combo)
+        self.marker_size = QDoubleSpinBox()
+        self.marker_size.setRange(1.0, 8.0)
+        self.marker_size.setSingleStep(0.2)
+        self.marker_size.setDecimals(1)
+        self.marker_size.setSuffix(" px")
+        self.marker_size.setValue(config.marker_size)
+        form.addRow("散点大小", self.marker_size)
+        layout.addLayout(form)
+
+        colors_label = QLabel("线序列颜色")
+        colors_label.setObjectName("sectionTitle")
+        layout.addWidget(colors_label)
+        colors_layout = QGridLayout()
+        colors_layout.setSpacing(7)
+        self.color_buttons: list[QPushButton] = []
+        for index, color in enumerate(self._colors):
+            button = QPushButton()
+            button.setFixedSize(38, 28)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.clicked.connect(
+                lambda checked=False, item=index: self._choose_color(item)
+            )
+            self.color_buttons.append(button)
+            colors_layout.addWidget(button, index // 4, index % 4)
+        reset_colors = QPushButton("恢复默认")
+        reset_colors.setObjectName("smallButton")
+        reset_colors.clicked.connect(self._reset_colors)
+        colors_layout.addWidget(reset_colors, len(self._colors) // 4, 0, 1, 2)
+        layout.addLayout(colors_layout)
+        self._refresh_color_buttons()
+        self.render_combo.currentIndexChanged.connect(self._sync_marker_state)
+        self._sync_marker_state()
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _sync_marker_state(self) -> None:
+        self.marker_size.setEnabled(self.render_combo.currentData() == "scatter")
+
+    def _refresh_color_buttons(self) -> None:
+        for button, color in zip(self.color_buttons, self._colors):
+            button.setStyleSheet(
+                f"background: {color}; border: 1px solid #64748b; "
+                "border-radius: 6px;"
+            )
+
+    def _choose_color(self, index: int) -> None:
+        color = QColorDialog.getColor(
+            QColor(self._colors[index]),
+            self,
+            "选择线序列颜色",
+        )
+        if color.isValid():
+            self._colors[index] = color.name()
+            self._refresh_color_buttons()
+
+    def _reset_colors(self) -> None:
+        self._colors = list(DEFAULT_SERIES_COLORS)
+        self._refresh_color_buttons()
+
+    def values(self) -> tuple[str, float, tuple[str, ...]]:
+        return (
+            str(self.render_combo.currentData()),
+            self.marker_size.value(),
+            tuple(self._colors),
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -246,6 +358,8 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self._build_ui()
         enforce_design_invariants(self)
+        self._apply_application_theme()
+        self._apply_render_settings()
         self._install_shortcuts()
         self._apply_data_type("cd")
         self._refresh_recent_projects()
@@ -313,6 +427,35 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(self.add_files_action)
         self.toolbar.addAction(self.copy_action)
 
+        self.font_action = QAction("字体…", self)
+        self.light_theme_action = QAction("日间模式", self)
+        self.dark_theme_action = QAction("夜间模式", self)
+        self.light_theme_action.setCheckable(True)
+        self.dark_theme_action.setCheckable(True)
+        self.other_settings_action = QAction("其它设置…", self)
+        self.font_action.triggered.connect(self._choose_font)
+        self.light_theme_action.triggered.connect(lambda: self._set_theme("light"))
+        self.dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
+        self.other_settings_action.triggered.connect(self._open_other_settings)
+
+        self.view_button = QToolButton()
+        self.view_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.view_button.setText("查看")
+        self.view_menu = QMenu(self.view_button)
+        self.view_menu.setObjectName("viewMenu")
+        self.view_menu.setFont(_font(self.user_config.font_size))
+        self.theme_menu = QMenu("主题", self.view_menu)
+        self.theme_menu.setObjectName("themeMenu")
+        self.theme_menu.setFont(_font(self.user_config.font_size))
+        self.theme_menu.addAction(self.light_theme_action)
+        self.theme_menu.addAction(self.dark_theme_action)
+        self.view_menu.addAction(self.font_action)
+        self.view_menu.addMenu(self.theme_menu)
+        self.view_menu.addSeparator()
+        self.view_menu.addAction(self.other_settings_action)
+        self.view_button.setMenu(self.view_menu)
+        self.toolbar.addWidget(self.view_button)
+
         spacer = QWidget()
         spacer.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
@@ -330,13 +473,15 @@ class MainWindow(QMainWindow):
         self.recent_tabs.setObjectName("recentTabs")
         self.recent_tabs.setDocumentMode(True)
         self.recent_tabs.setExpanding(False)
-        self.recent_tabs.setMovable(False)
+        self.recent_tabs.setMovable(True)
+        self.recent_tabs.setChangeCurrentOnDrag(False)
         self.recent_tabs.setTabsClosable(False)
         self.recent_tabs.setUsesScrollButtons(True)
         self.recent_tabs.setElideMode(Qt.TextElideMode.ElideRight)
         self.recent_tabs.currentChanged.connect(
             self._recent_project_selected
         )
+        self.recent_tabs.tabMoved.connect(self._recent_tabs_reordered)
         recent_layout.addWidget(recent_label)
         recent_layout.addWidget(self.recent_tabs, 1)
         self.addToolBarBreak(Qt.ToolBarArea.TopToolBarArea)
@@ -364,10 +509,7 @@ class MainWindow(QMainWindow):
         title_box.setSpacing(1)
         title = QLabel("DataMerger")
         title.setObjectName("title")
-        self.subtitle = QLabel()
-        self.subtitle.setObjectName("muted")
         title_box.addWidget(title)
-        title_box.addWidget(self.subtitle)
         header.addLayout(title_box)
         header.addStretch(1)
         outer.addLayout(header)
@@ -468,15 +610,12 @@ class MainWindow(QMainWindow):
         self.merge_channels_row = QHBoxLayout()
         self.merge_channels_row.setSpacing(7)
         channel_layout.addLayout(self.merge_channels_row)
-        preview_label = QLabel("散点预览")
+        preview_label = QLabel("图表预览")
         preview_label.setObjectName("muted")
         channel_layout.addWidget(preview_label)
         self.preview_channels_row = QHBoxLayout()
         self.preview_channels_row.setSpacing(7)
         channel_layout.addLayout(self.preview_channels_row)
-        config_hint = QLabel("通道勾选会自动保存到用户配置")
-        config_hint.setObjectName("muted")
-        channel_layout.addWidget(config_hint)
         self.left_splitter.addWidget(self.channel_card)
         self.left_splitter.setStretchFactor(0, 1)
         self.left_splitter.setSizes([430, 190])
@@ -509,7 +648,7 @@ class MainWindow(QMainWindow):
         self.preview_tabs.setObjectName("previewTabs")
         self.preview_tabs.setDocumentMode(True)
         self.plot_preview = PlotPreviewWidget()
-        self.preview_tabs.addTab(self.plot_preview, "数据散点")
+        self.preview_tabs.addTab(self.plot_preview, "数据图")
         self.preview = QPlainTextEdit()
         self.preview.setObjectName("preview")
         self.preview.setReadOnly(True)
@@ -584,17 +723,98 @@ class MainWindow(QMainWindow):
             action.setShortcut(shortcut)
             self.addAction(action)
 
+    def _persist_user_config(self) -> None:
+        try:
+            save_user_config(self.config_path, self.user_config)
+            self._clear_error()
+        except OSError as exc:
+            self._show_error(f"无法保存用户配置：{exc}")
+
+    def _apply_application_theme(self) -> None:
+        app = QApplication.instance()
+        if app is None:
+            return
+        apply_theme(
+            app,
+            APP_STYLE,
+            mode=self.user_config.theme_mode,
+            font_family=self.user_config.font_family,
+            font_size=self.user_config.font_size,
+        )
+        self.light_theme_action.setChecked(self.user_config.theme_mode == "light")
+        self.dark_theme_action.setChecked(self.user_config.theme_mode == "dark")
+        menu_font = _font(self.user_config.font_size, family=self.user_config.font_family)
+        self.file_menu.setFont(menu_font)
+        self.type_menu.setFont(menu_font)
+        self.view_menu.setFont(menu_font)
+        self.theme_menu.setFont(menu_font)
+        size = self.user_config.font_size
+        family = self.user_config.font_family
+        title = self.findChild(QLabel, "title")
+        if title is not None:
+            title.setFont(_font(size + 10, QFont.Weight.Bold, family))
+        for section in self.findChildren(QLabel, "sectionTitle"):
+            section.setFont(_font(size + 3, QFont.Weight.DemiBold, family))
+        for drop_title in self.findChildren(QLabel, "dropTitle"):
+            drop_title.setFont(_font(size + 4, QFont.Weight.DemiBold, family))
+        icon_color = QApplication.palette().color(QPalette.ColorRole.Text).name()
+        accent_color = theme_colors(active_mode())["accent"]
+        self.drop_zone.refresh_theme()
+        self.add_files_action.setIcon(_icon("add", accent_color))
+        self.copy_action.setIcon(_icon("copy", icon_color))
+        self.up_button.setIcon(_icon("up", icon_color, 15))
+        self.down_button.setIcon(_icon("down", icon_color, 15))
+        self.remove_button.setIcon(_icon("trash", icon_color, 15))
+        self._refresh_table()
+        for plot in self.plot_preview.plots:
+            plot.refresh_theme()
+
+    def _apply_render_settings(self) -> None:
+        self.plot_preview.set_render_settings(
+            self.user_config.render_mode,
+            self.user_config.marker_size,
+            self.user_config.series_colors,
+        )
+
+    def _choose_font(self) -> None:
+        current = QApplication.font() if QApplication.instance() else QFont()
+        selected, accepted = QFontDialog.getFont(current, self, "选择界面字体")
+        if not accepted:
+            return
+        self.user_config = replace(
+            self.user_config,
+            font_family=selected.family(),
+            font_size=max(8, min(22, selected.pointSize())),
+        )
+        self._persist_user_config()
+        self._apply_application_theme()
+
+    def _set_theme(self, mode: str) -> None:
+        mode = "dark" if mode == "dark" else "light"
+        self.user_config = replace(self.user_config, theme_mode=mode)
+        self._persist_user_config()
+        self._apply_application_theme()
+
+    def _open_other_settings(self) -> None:
+        dialog = OtherSettingsDialog(self.user_config, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        render_mode, marker_size, series_colors = dialog.values()
+        self.user_config = replace(
+            self.user_config,
+            render_mode=render_mode,
+            marker_size=marker_size,
+            series_colors=series_colors,
+        )
+        self._persist_user_config()
+        self._apply_render_settings()
+
     def _apply_data_type(self, data_type: str) -> None:
         self.data_type = data_type
         self.cd_action.setChecked(data_type == "cd")
         self.electrochem_action.setChecked(data_type == "electrochem")
         display = DATA_TYPE_NAMES[data_type]
         self.type_button.setText(f"数据类型：{display}")
-        self.subtitle.setText(
-            "JASCO 光谱 → 精确并集 → Origin 宽表"
-            if data_type == "cd"
-            else "CHI 电化学 → 自动识别横坐标 → 精确并集"
-        )
         self.drop_zone.set_mode(data_type)
         self.formula_button.setVisible(data_type == "cd")
         self.files_hint.setText(
@@ -811,6 +1031,7 @@ class MainWindow(QMainWindow):
     def _refresh_table(self) -> None:
         self._refreshing_table = True
         blocker = QSignalBlocker(self.file_table)
+        text_color = QColor(theme_colors(active_mode())["text"])
         self.file_table.setRowCount(len(self.entries))
         for row, entry in enumerate(self.entries):
             check = QTableWidgetItem()
@@ -824,12 +1045,14 @@ class MainWindow(QMainWindow):
             )
             self.file_table.setItem(row, 0, check)
             order = QTableWidgetItem(str(row + 1))
-            order.setForeground(QColor("#253044"))
+            order.setForeground(text_color)
             order.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.file_table.setItem(row, 1, order)
             name = QTableWidgetItem(entry.path.name)
             name.setForeground(
-                QColor("#b42318") if entry.error else QColor("#253044")
+                QColor(theme_colors(active_mode())["danger"])
+                if entry.error
+                else text_color
             )
             name.setToolTip(
                 f"{entry.path}\n{entry.error}" if entry.error else str(entry.path)
@@ -847,13 +1070,13 @@ class MainWindow(QMainWindow):
                 points_text = f"{dataset.points:,}"
                 span_text = f"{dataset.axis.label}  {dataset.x_min:g}–{dataset.x_max:g}"
             points = QTableWidgetItem(points_text)
-            points.setForeground(QColor("#253044"))
+            points.setForeground(text_color)
             points.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
             self.file_table.setItem(row, 3, points)
             span = QTableWidgetItem(span_text)
-            span.setForeground(QColor("#253044"))
+            span.setForeground(text_color)
             span.setTextAlignment(
                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             )
@@ -1266,6 +1489,20 @@ class MainWindow(QMainWindow):
             if not self._open_project(path):
                 self._select_current_recent_tab()
 
+    def _recent_tabs_reordered(self, from_index: int, to_index: int) -> None:
+        del from_index, to_index
+        if self._refreshing_recent:
+            return
+        projects = [
+            path
+            for index in range(self.recent_tabs.count())
+            if isinstance((path := self.recent_tabs.tabData(index)), str) and path
+        ]
+        try:
+            save_recent_project_order(self.recent_config, projects)
+        except OSError as exc:
+            self._show_error(f"无法保存最近工程顺序：{exc}")
+
     def dragEnterEvent(self, event) -> None:  # type: ignore[no-untyped-def]
         if event.mimeData().hasUrls() and any(
             url.isLocalFile() for url in event.mimeData().urls()
@@ -1320,8 +1557,6 @@ QToolBar QToolButton {
     border: 1px solid transparent;
     border-radius: 7px;
     padding: 6px 10px;
-    font-family: "Microsoft YaHei UI";
-    font-size: 12px;
 }
 QToolBar QToolButton:hover {
     background: #f1f5f9;
@@ -1337,7 +1572,6 @@ QWidget#recentHost {
 }
 QLabel#recentLabel {
     color: #64748b;
-    font-size: 11px;
     font-weight: 600;
 }
 QTabBar#recentTabs {
@@ -1367,14 +1601,11 @@ QTabBar#recentTabs::tab:hover:!selected {
     background: #f5f8fb;
 }
 QLabel#title {
-    font-family: "Microsoft YaHei UI";
-    font-size: 22px;
     font-weight: 700;
     color: #0f172a;
 }
 QLabel#muted {
     color: #64748b;
-    font-size: 12px;
 }
 QLabel#smallBadge, QLabel#pill {
     background: #eff6ff;
@@ -1382,7 +1613,6 @@ QLabel#smallBadge, QLabel#pill {
     border: 1px solid #dbeafe;
     border-radius: 11px;
     padding: 4px 9px;
-    font-size: 11px;
 }
 QLabel#smallBadge, QLabel#pill {
     background: #f8fafc;
@@ -1426,12 +1656,10 @@ QLabel#dropIcon {
     border-radius: 15px;
 }
 QLabel#dropTitle {
-    font-size: 15px;
     font-weight: 600;
     color: #172033;
 }
 QLabel#sectionTitle {
-    font-size: 14px;
     font-weight: 700;
     color: #172033;
 }
@@ -1444,11 +1672,8 @@ QLabel#error {
 }
 QLabel#status {
     color: #64748b;
-    font-size: 11px;
 }
 QPushButton {
-    font-family: "Microsoft YaHei UI";
-    font-size: 12px;
     border-radius: 8px;
     padding: 7px 12px;
 }
@@ -1490,7 +1715,6 @@ QHeaderView::section {
     border: none;
     border-bottom: 1px solid #e5eaf0;
     padding: 7px 6px;
-    font-size: 11px;
     font-weight: 600;
 }
 QPlainTextEdit#preview {
@@ -1537,7 +1761,6 @@ QFrame#plotCard {
 }
 QCheckBox {
     color: #334155;
-    font-size: 12px;
     spacing: 6px;
 }
 QMenu {
@@ -1546,14 +1769,10 @@ QMenu {
     border: 1px solid #dfe7ef;
     border-radius: 8px;
     padding: 3px;
-    font-family: "Microsoft YaHei UI";
-    font-size: 12px;
 }
 QMenu::item {
     color: #253044;
     background: transparent;
-    font-family: "Microsoft YaHei UI";
-    font-size: 12px;
     min-height: 14px;
     padding: 3px 24px 3px 18px;
     margin: 0px 1px;

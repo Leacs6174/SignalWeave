@@ -8,7 +8,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl  # noqa: E402
-from PySide6.QtGui import QColor, QDropEvent  # noqa: E402
+from PySide6.QtGui import QDropEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (  # noqa: E402
 )
 
 from app import MainWindow  # noqa: E402
+from project_io import load_recent_projects  # noqa: E402
 from theme import apply_theme  # noqa: E402
-from ui_main import APP_STYLE  # noqa: E402
+from ui_main import APP_STYLE, OtherSettingsDialog  # noqa: E402
 from user_config import UserConfig, load_user_config  # noqa: E402
 
 
@@ -39,10 +40,14 @@ class UiSmokeTests(unittest.TestCase):
         self.window.recent_config = Path(self.temp.name) / "recent.json"
         self.window.config_path = Path(self.temp.name) / "config.json"
         self.window.user_config = UserConfig()
+        self.window._apply_application_theme()
+        self.window._apply_render_settings()
         self.window._sync_channel_controls()
 
     def tearDown(self) -> None:
         self.window._dirty = False
+        self.window.user_config = UserConfig()
+        self.window._apply_application_theme()
         self.window.close()
         self.window.deleteLater()
         self.app.processEvents()
@@ -133,7 +138,12 @@ class UiSmokeTests(unittest.TestCase):
         self.assertIsNotNone(self.window.result)
         for row in range(2):
             item = self.window.file_table.item(row, 2)
-            self.assertEqual(item.foreground().color(), QColor("#253044"))
+            self.assertEqual(
+                item.foreground().color(),
+                self.window.palette().color(
+                    self.window.palette().ColorRole.Text
+                ),
+            )
         self.assertFalse(self.window.grab().isNull())
         self.window._dirty = False
         self.window.close()
@@ -230,6 +240,11 @@ class UiSmokeTests(unittest.TestCase):
             "本地处理",
             " ".join(label.text() for label in self.window.findChildren(QLabel)),
         )
+        visible_text = " ".join(
+            label.text() for label in self.window.findChildren(QLabel)
+        )
+        self.assertNotIn("自动识别横坐标", visible_text)
+        self.assertNotIn("拖动绘图区框选缩放", visible_text)
         self.assertEqual(
             [action.text() for action in self.window.file_menu.actions()],
             ["新建工程", "打开工程", "保存工程", "工程另存为", "关闭工程"],
@@ -237,6 +252,10 @@ class UiSmokeTests(unittest.TestCase):
         self.assertEqual(
             [action.text() for action in self.window.type_menu.actions()],
             ["CD 光谱", "电化学"],
+        )
+        self.assertEqual(
+            [action.text() for action in self.window.view_menu.actions()],
+            ["字体…", "主题", "", "其它设置…"],
         )
         self.assertLessEqual(self.window.file_menu.sizeHint().height(), 150)
         self.window._apply_data_type("electrochem")
@@ -269,6 +288,46 @@ class UiSmokeTests(unittest.TestCase):
         config = load_user_config(self.window.config_path)
         self.assertEqual(config.electrochem_preview_channels, ())
         self.assertEqual(len(self.window.plot_preview.plots), 0)
+
+    def test_default_line_render_and_render_settings(self) -> None:
+        self.window._apply_data_type("electrochem")
+        self.window._add_paths(
+            [str(FIXTURES / "OER_A.txt"), str(FIXTURES / "OER_B.txt")]
+        )
+        self.window._recompute_merge()
+        plot = self.window.plot_preview.plots[0]
+        self.assertEqual(plot.render_mode, "line")
+        self.assertEqual(plot.marker_size, 1.8)
+        self.assertGreaterEqual(len(set(plot.series_colors)), 4)
+
+        self.window.user_config = UserConfig(
+            render_mode="scatter",
+            marker_size=1.2,
+            series_colors=("#112233", "#445566", "#778899"),
+        )
+        self.window._apply_render_settings()
+        self.assertEqual(plot.render_mode, "scatter")
+        self.assertEqual(plot.marker_size, 1.2)
+        self.assertEqual(
+            plot.series_colors, ("#112233", "#445566", "#778899")
+        )
+        dialog = OtherSettingsDialog(self.window.user_config, self.window)
+        self.assertEqual(dialog.render_combo.currentData(), "scatter")
+        self.assertAlmostEqual(dialog.marker_size.value(), 1.2)
+        self.assertEqual(len(dialog.color_buttons), 3)
+        dialog.close()
+
+    def test_theme_and_font_settings_apply_and_persist(self) -> None:
+        self.window._set_theme("dark")
+        self.assertEqual(self.app.property("dataMergerTheme"), "dark")
+        self.assertEqual(load_user_config(self.window.config_path).theme_mode, "dark")
+        self.window._set_theme("light")
+        self.assertEqual(self.app.property("dataMergerTheme"), "light")
+
+        configured = UserConfig(font_family="Segoe UI", font_size=13)
+        self.window.user_config = configured
+        self.window._apply_application_theme()
+        self.assertEqual(self.app.font().pointSize(), 13)
 
     def test_function_panes_are_resizable(self) -> None:
         self.window.show()
@@ -319,13 +378,20 @@ class UiSmokeTests(unittest.TestCase):
         self.window.project_path = second
         self.assertTrue(self.window._save_project())
         self.assertEqual(self.window.recent_tabs.count(), 2)
-        self.assertEqual(self.window.recent_tabs.tabText(0), "second")
-        self.assertEqual(self.window.recent_tabs.tabText(1), "first")
+        self.assertEqual(self.window.recent_tabs.tabText(0), "first")
+        self.assertEqual(self.window.recent_tabs.tabText(1), "second")
 
         self.window.recent_tabs.setCurrentIndex(1)
         self.app.processEvents()
-        self.assertEqual(self.window.project_path, first.resolve())
-        self.assertEqual(self.window.entries[0].path.name, "A.txt")
+        self.assertEqual(self.window.project_path, second.resolve())
+        self.assertEqual(self.window.entries[0].path.name, "B.txt")
+        self.assertEqual(self.window.recent_tabs.tabText(0), "first")
+        self.assertEqual(self.window.recent_tabs.tabText(1), "second")
+
+        self.window.recent_tabs.moveTab(1, 0)
+        self.app.processEvents()
+        self.assertEqual(self.window.recent_tabs.tabText(0), "second")
+        self.assertEqual(load_recent_projects(self.window.recent_config)[0], str(second.resolve()))
 
 
 if __name__ == "__main__":

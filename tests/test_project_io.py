@@ -11,6 +11,7 @@ from project_io import (
     load_recent_projects,
     record_recent_project,
     save_project,
+    save_recent_project_order,
 )
 
 
@@ -57,6 +58,14 @@ class ProjectTests(unittest.TestCase):
         result = record_recent_project(config, first)
         self.assertEqual(result, [str(first.resolve()), str(second.resolve())])
         self.assertEqual(load_recent_projects(config), result)
+
+    def test_recent_reorder_is_persisted_without_opening_side_effects(self) -> None:
+        config = self.root / "recent.json"
+        first = self.root / "first.dmproj"
+        second = self.root / "second.dmproj"
+        ordered = save_recent_project_order(config, [str(second), str(first)])
+        self.assertEqual(ordered, [str(second.resolve()), str(first.resolve())])
+        self.assertEqual(load_recent_projects(config), ordered)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QApplication,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
@@ -24,7 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 from plot_data import ScatterGraph
-from theme import CHANNEL_COLORS
+from theme import chart_colors
+from user_config import DEFAULT_MARKER_SIZE, DEFAULT_SERIES_COLORS
 
 
 def _expanded_range(low: float, high: float) -> tuple[float, float]:
@@ -39,6 +41,13 @@ def _format_tick(value: float) -> str:
     if value == 0:
         return "0"
     return f"{value:.4g}"
+
+
+def _plot_font(size_delta: int, weight: QFont.Weight) -> QFont:
+    font = QFont(QApplication.font())
+    font.setPointSize(max(6, font.pointSize() + size_delta))
+    font.setWeight(weight)
+    return font
 
 
 class _SelectionOverlay(QWidget):
@@ -59,19 +68,33 @@ class _SelectionOverlay(QWidget):
         del event
         if self._selection is None:
             return
+        tokens = chart_colors()
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor("#2563eb"), 1.2, Qt.PenStyle.DashLine))
-        painter.setBrush(QColor(37, 99, 235, 32))
+        selection_color = QColor(tokens["selection"])
+        painter.setPen(QPen(selection_color, 1.2, Qt.PenStyle.DashLine))
+        selection_color.setAlpha(48)
+        painter.setBrush(selection_color)
         painter.drawRect(self._selection)
 
 
 class ScatterPlot(QWidget):
     zoomChanged = Signal(bool)
 
-    def __init__(self, graph: ScatterGraph, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        graph: ScatterGraph,
+        parent: QWidget | None = None,
+        *,
+        render_mode: str = "line",
+        marker_size: float = DEFAULT_MARKER_SIZE,
+        series_colors: tuple[str, ...] = DEFAULT_SERIES_COLORS,
+    ) -> None:
         super().__init__(parent)
         self.graph = graph
+        self.render_mode = render_mode
+        self.marker_size = marker_size
+        self.series_colors = series_colors
         self.setMinimumHeight(230)
         self.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -96,6 +119,23 @@ class ScatterPlot(QWidget):
         self._selection_overlay = _SelectionOverlay(self)
         self._selection_overlay.setGeometry(self.rect())
         self._selection_overlay.show()
+
+    def apply_render_settings(
+        self,
+        render_mode: str,
+        marker_size: float,
+        series_colors: tuple[str, ...],
+    ) -> None:
+        self.render_mode = render_mode
+        self.marker_size = marker_size
+        self.series_colors = series_colors or DEFAULT_SERIES_COLORS
+        self._static_cache = None
+        self.update()
+
+    def refresh_theme(self) -> None:
+        self._static_cache = None
+        self._selection_overlay.update()
+        self.update()
 
     def sizeHint(self) -> QSize:
         return QSize(520, 260)
@@ -292,14 +332,15 @@ class ScatterPlot(QWidget):
         painter.drawPixmap(0, 0, self._static_cache)
 
     def _paint_static(self, painter: QPainter) -> None:
+        tokens = chart_colors()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         bounds = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        painter.setPen(QPen(QColor("#e2e8f0"), 1))
-        painter.setBrush(QColor("#ffffff"))
+        painter.setPen(QPen(QColor(tokens["border"]), 1))
+        painter.setBrush(QColor(tokens["surface"]))
         painter.drawRoundedRect(bounds, 10, 10)
         plot = self._plot_rect()
-        painter.setFont(QFont("Microsoft YaHei UI", 10, QFont.Weight.DemiBold))
-        painter.setPen(QColor("#172033"))
+        painter.setFont(_plot_font(0, QFont.Weight.DemiBold))
+        painter.setPen(QColor(tokens["heading"]))
         painter.drawText(
             QRectF(16, 10, self.width() - 32, 26),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
@@ -307,8 +348,8 @@ class ScatterPlot(QWidget):
         )
 
         if not self._has_data:
-            painter.setFont(QFont("Microsoft YaHei UI", 9))
-            painter.setPen(QColor("#94a3b8"))
+            painter.setFont(_plot_font(-1, QFont.Weight.Normal))
+            painter.setPen(QColor(tokens["muted"]))
             painter.drawText(
                 bounds,
                 Qt.AlignmentFlag.AlignCenter,
@@ -318,8 +359,8 @@ class ScatterPlot(QWidget):
 
         x_min, x_max = self._view_x
         y_min, y_max = self._view_y
-        painter.setFont(QFont("Segoe UI", 8))
-        painter.setPen(QPen(QColor("#e8edf3"), 1))
+        painter.setFont(_plot_font(-2, QFont.Weight.Normal))
+        painter.setPen(QPen(QColor(tokens["grid"]), 1))
         tick_count = 5
         for index in range(tick_count + 1):
             fraction = index / tick_count
@@ -328,10 +369,10 @@ class ScatterPlot(QWidget):
             painter.drawLine(QPointF(x, plot.top()), QPointF(x, plot.bottom()))
             painter.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y))
 
-        painter.setPen(QPen(QColor("#8a99aa"), 1.2))
+        painter.setPen(QPen(QColor(tokens["axis"]), 1.2))
         painter.drawLine(plot.bottomLeft(), plot.bottomRight())
         painter.drawLine(plot.bottomLeft(), plot.topLeft())
-        painter.setPen(QColor("#64748b"))
+        painter.setPen(QColor(tokens["muted"]))
         for index in range(tick_count + 1):
             fraction = index / tick_count
             x = plot.left() + plot.width() * fraction
@@ -347,7 +388,7 @@ class ScatterPlot(QWidget):
                 _format_tick(self._y_tick(fraction)),
             )
 
-        painter.setPen(QColor("#64748b"))
+        painter.setPen(QColor(tokens["muted"]))
         painter.drawText(
             QRectF(plot.left(), self.height() - 26, plot.width(), 18),
             Qt.AlignmentFlag.AlignCenter,
@@ -359,19 +400,13 @@ class ScatterPlot(QWidget):
             self.graph.y_label,
         )
 
-        base = QColor(CHANNEL_COLORS[self.graph.color_index % len(CHANNEL_COLORS)])
         legend_x = plot.left()
         for series_index, series in enumerate(self.graph.series):
-            color = QColor(base)
-            if series_index:
-                color = color.lighter(108 + (series_index % 4) * 10)
-            painter.setPen(
-                QPen(
-                    color,
-                    4.2,
-                    Qt.PenStyle.SolidLine,
-                    Qt.PenCapStyle.RoundCap,
-                )
+            color = QColor(
+                self.series_colors[
+                    (self.graph.color_index + series_index)
+                    % len(self.series_colors)
+                ]
             )
             points = QPolygonF()
             for x_value, y_value in zip(series.x, series.y):
@@ -380,9 +415,29 @@ class ScatterPlot(QWidget):
                 points.append(
                     QPointF(self._raw_to_x(x_value), self._raw_to_y(y_value))
                 )
-            painter.drawPoints(points)
+            if self.render_mode == "scatter":
+                painter.setPen(
+                    QPen(
+                        color,
+                        self.marker_size,
+                        Qt.PenStyle.SolidLine,
+                        Qt.PenCapStyle.RoundCap,
+                    )
+                )
+                painter.drawPoints(points)
+            else:
+                painter.setPen(
+                    QPen(
+                        color,
+                        1.8,
+                        Qt.PenStyle.SolidLine,
+                        Qt.PenCapStyle.RoundCap,
+                        Qt.PenJoinStyle.RoundJoin,
+                    )
+                )
+                painter.drawPolyline(points)
             painter.setPen(color)
-            painter.setFont(QFont("Microsoft YaHei UI", 8))
+            painter.setFont(_plot_font(-1, QFont.Weight.Normal))
             legend_width = min(185, 22 + len(series.name) * 12)
             if legend_x + legend_width > plot.right():
                 legend_x = plot.left()
@@ -404,9 +459,6 @@ class PlotPreviewWidget(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(6)
         tools = QHBoxLayout()
-        hint = QLabel("拖动绘图区框选缩放；拖动横轴或纵轴可单轴缩放")
-        hint.setObjectName("muted")
-        tools.addWidget(hint)
         tools.addStretch(1)
         self.reset_button = QPushButton("复位")
         self.reset_button.setObjectName("smallButton")
@@ -430,6 +482,9 @@ class PlotPreviewWidget(QWidget):
         self._scroll.setWidget(self._host)
         outer.addWidget(self._scroll, 1)
         self._plots: list[ScatterPlot] = []
+        self._render_mode = "line"
+        self._marker_size = DEFAULT_MARKER_SIZE
+        self._series_colors = DEFAULT_SERIES_COLORS
         self.set_graphs(())
 
     @property
@@ -457,7 +512,12 @@ class PlotPreviewWidget(QWidget):
             card.setObjectName("plotCard")
             layout = QVBoxLayout(card)
             layout.setContentsMargins(6, 6, 6, 6)
-            plot = ScatterPlot(graph)
+            plot = ScatterPlot(
+                graph,
+                render_mode=self._render_mode,
+                marker_size=self._marker_size,
+                series_colors=self._series_colors,
+            )
             plot.zoomChanged.connect(self._zoom_changed)
             layout.addWidget(plot)
             self._layout.addWidget(card)
@@ -472,3 +532,17 @@ class PlotPreviewWidget(QWidget):
         for plot in self._plots:
             plot.reset_zoom()
         self.reset_button.setEnabled(False)
+
+    def set_render_settings(
+        self,
+        render_mode: str,
+        marker_size: float,
+        series_colors: tuple[str, ...],
+    ) -> None:
+        self._render_mode = "scatter" if render_mode == "scatter" else "line"
+        self._marker_size = marker_size
+        self._series_colors = series_colors or DEFAULT_SERIES_COLORS
+        for plot in self._plots:
+            plot.apply_render_settings(
+                self._render_mode, self._marker_size, self._series_colors
+            )

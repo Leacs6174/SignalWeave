@@ -128,14 +128,31 @@ def record_recent_project(
     project_path: str | Path,
     limit: int = 8,
 ) -> list[str]:
+    """Append a new project without changing the order of existing tabs."""
     config = Path(config_path)
     normalized = str(Path(project_path).resolve(strict=False))
-    projects = [
-        item
-        for item in load_recent_projects(config)
-        if os.path.normcase(item) != os.path.normcase(normalized)
-    ]
-    projects.insert(0, normalized)
+    projects = load_recent_projects(config)
+    if not any(
+        os.path.normcase(item) == os.path.normcase(normalized)
+        for item in projects
+    ):
+        projects.append(normalized)
     projects = projects[:limit]
     _write_json_atomic(config, {"projects": projects})
     return projects
+
+
+def save_recent_project_order(
+    config_path: str | Path,
+    projects: list[str],
+) -> list[str]:
+    config = Path(config_path)
+    ordered = list(
+        dict.fromkeys(
+            str(Path(item).resolve(strict=False))
+            for item in projects
+            if item
+        )
+    )
+    _write_json_atomic(config, {"projects": ordered})
+    return ordered

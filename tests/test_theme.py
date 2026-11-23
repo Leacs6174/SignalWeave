@@ -72,6 +72,8 @@ class ThemeTests(unittest.TestCase):
             self.app.palette().color(self.app.palette().ColorRole.Text).name(),
             "#253044",
         )
+        self.assertEqual(colors("light")["accent"], "#39c5bb")
+        self.assertNotIn("QCheckBox::indicator:checked", BASE_STYLE)
 
     def test_dark_mode_tokens_are_strict_grayscale(self) -> None:
         for name, value in colors("dark").items():

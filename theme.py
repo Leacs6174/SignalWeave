@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
-from PySide6.QtWidgets import QApplication, QTabBar, QWidget
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontDatabase,
+    QPainter,
+    QPalette,
+    QPen,
+    QPolygonF,
+)
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle, QTabBar, QWidget
 
 from user_config import DEFAULT_SERIES_COLORS
 
@@ -18,10 +27,10 @@ LIGHT_COLORS = {
     "text_heading": "#172033",
     "text_muted": "#64748b",
     "text_disabled": "#94a3b8",
-    "accent": "#2563eb",
-    "accent_hover": "#1d4ed8",
-    "accent_soft": "#eff6ff",
-    "selection": "#e8f1ff",
+    "accent": "#39c5bb",
+    "accent_hover": "#2fafa6",
+    "accent_soft": "#e8faf8",
+    "selection": "#d9f6f3",
     "danger": "#b42318",
     "danger_soft": "#fff1f2",
     "chart_grid": "#e8edf3",
@@ -74,8 +83,85 @@ def chart_colors(mode: str | None = None) -> dict[str, str]:
         "text": tokens["text"],
         "heading": tokens["text_heading"],
         "muted": tokens["text_muted"],
-        "selection": tokens["accent"] if resolved_mode == "dark" else "#3b82f6",
+        "selection": tokens["accent"],
     }
+
+
+class SignalWeaveStyle(QProxyStyle):
+    """Fusion styling with outlined check marks instead of filled boxes."""
+
+    def __init__(self) -> None:
+        super().__init__("Fusion")
+
+    def drawPrimitive(
+        self,
+        element,
+        option,
+        painter: QPainter,
+        widget: QWidget | None = None,
+    ) -> None:
+        check_elements = {
+            QStyle.PrimitiveElement.PE_IndicatorCheckBox,
+            QStyle.PrimitiveElement.PE_IndicatorItemViewItemCheck,
+            QStyle.PrimitiveElement.PE_IndicatorMenuCheckMark,
+        }
+        if element in check_elements:
+            self._draw_check_mark(option, painter)
+            return
+        super().drawPrimitive(element, option, painter, widget)
+
+    @staticmethod
+    def _draw_check_mark(option, painter: QPainter) -> None:
+        tokens = colors(active_mode())
+        rect = QRectF(option.rect)
+        side = min(15.0, rect.width() - 2.0, rect.height() - 2.0)
+        if side < 7:
+            return
+        box = QRectF(
+            rect.center().x() - side / 2,
+            rect.center().y() - side / 2,
+            side,
+            side,
+        )
+        enabled = bool(option.state & QStyle.StateFlag.State_Enabled)
+        checked = bool(option.state & QStyle.StateFlag.State_On)
+        hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        background = QColor(tokens["surface"])
+        if hovered and enabled:
+            background = QColor(tokens["accent_soft"])
+        border = QColor(tokens["accent"] if checked else tokens["border_strong"])
+        check = QColor(tokens["accent_hover"])
+        if not enabled:
+            background = QColor(tokens["surface_subtle"])
+            border = QColor(tokens["text_disabled"])
+            check = QColor(tokens["text_disabled"])
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(background)
+        painter.setPen(QPen(border, 1.4))
+        painter.drawRoundedRect(box.adjusted(0.7, 0.7, -0.7, -0.7), 3, 3)
+        if checked:
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(
+                QPen(
+                    check,
+                    max(1.7, side * 0.12),
+                    Qt.PenStyle.SolidLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
+                )
+            )
+            painter.drawPolyline(
+                QPolygonF(
+                    [
+                        QPointF(box.left() + side * 0.24, box.top() + side * 0.52),
+                        QPointF(box.left() + side * 0.43, box.top() + side * 0.70),
+                        QPointF(box.left() + side * 0.77, box.top() + side * 0.31),
+                    ]
+                )
+            )
+        painter.restore()
 
 
 def font(
@@ -182,21 +268,6 @@ QPushButton:disabled {{
 }}
 QCheckBox {{
     color: {tokens["text"]};
-}}
-QCheckBox::indicator {{
-    width: 15px;
-    height: 15px;
-    background: {tokens["surface"]};
-    border: 1px solid {tokens["border_strong"]};
-    border-radius: 3px;
-}}
-QCheckBox::indicator:checked {{
-    background: {tokens["accent"]};
-    border-color: {tokens["accent_hover"]};
-}}
-QCheckBox::indicator:disabled {{
-    background: {tokens["surface_subtle"]};
-    border-color: {tokens["border"]};
 }}
 QTabBar {{
     qproperty-drawBase: 0;
@@ -356,13 +427,11 @@ QMenu::item:selected {{
 QMenu::item:disabled {{
     color: {tokens["text_disabled"]};
 }}
-QMenu::indicator:checked {{
-    background: {tokens["accent"]};
-}}
 """
 
 
 BASE_STYLE = build_base_style("light")
+_CHECK_STYLE: SignalWeaveStyle | None = None
 
 
 def apply_theme(
@@ -372,9 +441,13 @@ def apply_theme(
     font_family: str = FONT_FAMILY,
     font_size: int = 10,
 ) -> None:
+    global _CHECK_STYLE
     mode = "dark" if mode == "dark" else "light"
     app.setProperty("dataMergerTheme", mode)
-    app.setStyle("Fusion")
+    if _CHECK_STYLE is None:
+        _CHECK_STYLE = SignalWeaveStyle()
+        _CHECK_STYLE.setParent(app)
+    app.setStyle(_CHECK_STYLE)
     app.setFont(font(font_size, family=font_family))
     app.setPalette(build_palette(mode))
     stylesheet = build_base_style(mode, font_family) + "\n" + screen_stylesheet

@@ -7,7 +7,7 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QMimeData, QPoint, QPointF, Qt, QUrl  # noqa: E402
+from PySide6.QtCore import QMimeData, QPoint, QPointF, QSize, Qt, QUrl  # noqa: E402
 from PySide6.QtGui import QDropEvent  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
@@ -217,6 +217,8 @@ class UiSmokeTests(unittest.TestCase):
     def test_toolbar_and_electrochem_mode(self) -> None:
         self.assertIn("SignalWeave", self.window.windowTitle())
         self.assertTrue(self.window.toolbar.isVisible() or not self.window.isVisible())
+        self.assertLessEqual(self.window.toolbar.sizeHint().height(), 40)
+        self.assertEqual(self.window.toolbar.iconSize(), QSize(16, 16))
         self.assertIsInstance(self.window.recent_tabs, QTabBar)
         self.assertIsInstance(self.window.content_splitter, QSplitter)
         self.assertIsInstance(self.window.left_splitter, QSplitter)
@@ -319,7 +321,7 @@ class UiSmokeTests(unittest.TestCase):
         dialog.close()
 
     def test_theme_and_font_settings_apply_and_persist(self) -> None:
-        self.assertIn("background: #2563eb;", APP_STYLE)
+        self.assertIn("background: #39c5bb;", APP_STYLE)
         self.window._set_theme("dark")
         self.assertEqual(self.app.property("dataMergerTheme"), "dark")
         self.assertEqual(load_user_config(self.window.config_path).theme_mode, "dark")

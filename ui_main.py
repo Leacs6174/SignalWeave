@@ -193,7 +193,7 @@ class DropZone(QFrame):
         layout.addLayout(text_layout, 1)
         self.choose_button = QPushButton(" 选择文件")
         self.choose_button.setObjectName("outlineButton")
-        self.choose_button.setIcon(_icon("add", "#2563eb", 16))
+        self.choose_button.setIcon(_icon("add", theme_colors("light")["accent"], 16))
         self.choose_button.setIconSize(QSize(16, 16))
         self.choose_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.choose_button.clicked.connect(self.chooseRequested)
@@ -373,6 +373,7 @@ class MainWindow(QMainWindow):
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
         self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.toolbar.setIconSize(QSize(16, 16))
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
 
         self.new_action = QAction("新建工程", self)
@@ -380,7 +381,11 @@ class MainWindow(QMainWindow):
         self.save_action = QAction("保存工程", self)
         self.save_as_action = QAction("工程另存为", self)
         self.close_project_action = QAction("关闭工程", self)
-        self.add_files_action = QAction(_icon("add", "#2563eb"), "添加数据", self)
+        self.add_files_action = QAction(
+            _icon("add", theme_colors("light")["accent"]),
+            "添加数据",
+            self,
+        )
         self.copy_action = QAction(_icon("copy", "#334155"), "复制结果", self)
         self.new_action.triggered.connect(self._new_project)
         self.open_project_action.triggered.connect(self._open_project_dialog)
@@ -1553,7 +1558,7 @@ QToolBar#mainToolbar, QToolBar#recentToolbar {
     background: #ffffff;
     border: none;
     border-bottom: 1px solid #dfe7ef;
-    padding: 5px 12px;
+    padding: 2px;
     spacing: 7px;
 }
 QToolBar#recentToolbar {
@@ -1564,7 +1569,7 @@ QToolBar QToolButton {
     color: #253044;
     border: 1px solid transparent;
     border-radius: 7px;
-    padding: 6px 10px;
+    padding: 4px 10px;
 }
 QToolBar QToolButton:hover {
     background: #f1f5f9;
@@ -1573,7 +1578,7 @@ QToolBar QToolButton:hover {
 QToolBar::separator {
     background: #e2e8f0;
     width: 1px;
-    margin: 4px 5px;
+    margin: 3px 5px;
 }
 QWidget#recentHost {
     background: #f8fafc;
@@ -1606,8 +1611,8 @@ QTabBar#recentTabs::tab:disabled {
 }
 QTabBar#recentTabs::tab:selected {
     background: #ffffff;
-    color: #1d4ed8;
-    border-color: #bfdbfe;
+    color: #168b84;
+    border-color: #8ee4dd;
     font-weight: 600;
 }
 QTabBar#recentTabs::tab:hover:!selected {
@@ -1621,9 +1626,9 @@ QLabel#muted {
     color: #64748b;
 }
 QLabel#smallBadge, QLabel#pill {
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #dbeafe;
+    background: #e8faf8;
+    color: #168b84;
+    border: 1px solid #bceee9;
     border-radius: 11px;
     padding: 4px 9px;
 }
@@ -1652,7 +1657,7 @@ QSplitter::handle:vertical {
     height: 8px;
 }
 QSplitter::handle:hover {
-    background: #dbeafe;
+    background: #d9f6f3;
 }
 QFrame#dropZone {
     background: #fbfdff;
@@ -1660,12 +1665,12 @@ QFrame#dropZone {
     border-radius: 14px;
 }
 QFrame#dropZone[hot="true"] {
-    background: #eff6ff;
-    border: 2px solid #3b82f6;
+    background: #e8faf8;
+    border: 2px solid #39c5bb;
 }
 QLabel#dropIcon {
-    background: #eff6ff;
-    border: 1px solid #dbeafe;
+    background: #e8faf8;
+    border: 1px solid #bceee9;
     border-radius: 15px;
 }
 QLabel#dropTitle {
@@ -1700,14 +1705,15 @@ QPushButton#outlineButton:hover, QPushButton#smallButton:hover {
     border-color: #b8c5d5;
 }
 QPushButton#primaryButton {
-    background: #2563eb;
-    color: white;
-    border: 1px solid #1d4ed8;
+    background: #39c5bb;
+    color: #073b37;
+    border: 1px solid #2fafa6;
     padding: 9px 15px;
     font-weight: 600;
 }
 QPushButton#primaryButton:hover {
-    background: #1d4ed8;
+    background: #2fafa6;
+    color: #ffffff;
 }
 QPushButton:disabled {
     color: #94a3b8;
@@ -1719,7 +1725,7 @@ QTableWidget#fileTable {
     border: 1px solid #e5eaf0;
     border-radius: 9px;
     gridline-color: #edf1f5;
-    selection-background-color: #e8f1ff;
+    selection-background-color: #d9f6f3;
     selection-color: #172033;
 }
 QHeaderView::section {
@@ -1736,7 +1742,7 @@ QPlainTextEdit#preview {
     border: 1px solid #e2e8f0;
     border-radius: 9px;
     padding: 9px;
-    selection-background-color: #dbeafe;
+    selection-background-color: #bceee9;
 }
 QTabWidget#previewTabs::pane {
     border: 1px solid #e2e8f0;
@@ -1761,7 +1767,7 @@ QTabWidget#previewTabs QTabBar {
 }
 QTabWidget#previewTabs QTabBar::tab:selected {
     background: #ffffff;
-    color: #1d4ed8;
+    color: #168b84;
 }
 QScrollArea#plotPreview, QWidget#plotHost {
     background: transparent;
@@ -1792,14 +1798,10 @@ QMenu::item {
     border-radius: 5px;
 }
 QMenu::item:selected {
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: #e8faf8;
+    color: #168b84;
 }
 QMenu::item:disabled {
     color: #94a3b8;
-}
-QMenu::indicator:checked {
-    background: #2563eb;
-    border-radius: 4px;
 }
 """
